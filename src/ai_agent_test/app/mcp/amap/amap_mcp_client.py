@@ -33,7 +33,7 @@ async def create_and_run_agent():
     - 明天上午10点我要从北京四惠地铁站到颐和园
     - 线路选择： 公交地铁或打车
     - 考虑出行时间和路线，以及天气状况和穿衣建议
-    - 输出一个 HTML 页面到：/Users/wxy/ai-agent-test/.temp 目录下
+    - 输出一个 HTML 页面到：/Users/wxy/ai-code_agent-test/.temp 目录下
     要求：
     - 制作网页来展示出线路和位置
     - 网页使用简约美观的页面风格，以及卡片展示

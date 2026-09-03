@@ -2,7 +2,7 @@
 # from mcp import ClientSession, StdioServerParameters
 # from mcp.client.stdio import stdio_client
 #
-# params = StdioServerParameters(command="python", args=["/Users/wxy/ai-agent-test/src/ai_agent_test/app/mcp/stdio/mcp_stdio_server.py"])
+# params = StdioServerParameters(command="python", args=["/Users/wxy/ai-code_agent-test/src/ai_agent_test/app/mcp/stdio/mcp_stdio_server.py"])
 #
 # async def main():
 #     async with stdio_client(params) as (r, w):
@@ -18,7 +18,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from langchain_mcp_adapters.tools import load_mcp_tools
 
-server_params = StdioServerParameters(command="python", args=["/Users/wxy/ai-agent-test/src/ai_agent_test/app/mcp/stdio/mcp_stdio_server.py"])
+server_params = StdioServerParameters(command="python", args=["/Users/wxy/ai-code_agent-test/src/ai_agent_test/app/mcp/stdio/mcp_stdio_server.py"])
 
 
 async def main():

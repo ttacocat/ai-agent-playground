@@ -14,7 +14,7 @@ agent = create_agent(
 
 user_input = """
 要求：
-1. 向 /Users/wxy/ai-agent-test/.temp 目录下写入一个新文件，名称为：index.html
+1. 向 /Users/wxy/ai-code_agent-test/.temp 目录下写入一个新文件，名称为：index.html
 2. 写一个企业的官网
 """
 
