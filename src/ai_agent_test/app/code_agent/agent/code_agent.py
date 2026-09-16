@@ -8,7 +8,7 @@ from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 
 from ai_agent_test.app.code_agent.model.model import qwen_llm
 from ai_agent_test.app.code_agent.tools.file_tools import file_tools
-from ai_agent_test.app.code_agent.tools.rag_tools import get_stdio_rag_tools
+from ai_agent_test.app.code_agent.tools.rag_self_tools import get_stdio_rag_self_tools
 from ai_agent_test.app.code_agent.tools.terminal_tools import get_stdio_terminal_tools
 
 async def run_agent():
@@ -17,8 +17,9 @@ async def run_agent():
 
         # shell_tools = await get_stdio_shell_tools()
         terminal_tools = await get_stdio_terminal_tools()
-        rag_tools = await get_stdio_rag_tools()
-        tools = file_tools + terminal_tools + rag_tools
+        # rag_tools = await get_stdio_rag_tools()
+        rag_self_tools = await get_stdio_rag_self_tools()
+        tools = file_tools + terminal_tools + rag_self_tools
         #方案二：提供一个rag工具，让智能体通过工具查询知识
         name = "bot"
         system_prompt = f"""
@@ -34,7 +35,7 @@ async def run_agent():
             system_prompt=system_prompt,
         )
 
-        config = RunnableConfig(configurable={"thread_id": "4"})
+        config = RunnableConfig(configurable={"thread_id": "6"})
 
         step = 0  # 一轮对话
         print("输入 exit / quit 退出对话\n")
