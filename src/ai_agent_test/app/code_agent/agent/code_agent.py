@@ -7,6 +7,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 
 from ai_agent_test.app.code_agent.model.model import qwen_llm
+from ai_agent_test.app.code_agent.tools.browser_tools import get_stdio_browser_tools
 from ai_agent_test.app.code_agent.tools.file_tools import file_tools
 from ai_agent_test.app.code_agent.tools.rag_self_tools import get_stdio_rag_self_tools
 from ai_agent_test.app.code_agent.tools.terminal_tools import get_stdio_terminal_tools
@@ -19,7 +20,8 @@ async def run_agent():
         terminal_tools = await get_stdio_terminal_tools()
         # rag_tools = await get_stdio_rag_tools()
         rag_self_tools = await get_stdio_rag_self_tools()
-        tools = file_tools + terminal_tools + rag_self_tools
+        browser_tools = await get_stdio_browser_tools()
+        tools = file_tools + terminal_tools + rag_self_tools + browser_tools
         #方案二：提供一个rag工具，让智能体通过工具查询知识
         name = "bot"
         system_prompt = f"""
@@ -65,7 +67,7 @@ async def run_agent():
             """
             try:
                 async for chunk in agent.astream(
-                    {"messages": [("user", prompt)]},
+                    {"messages": [("user", user_input)]},
                     config=config,
                     stream_mode="updates",
                 ):
