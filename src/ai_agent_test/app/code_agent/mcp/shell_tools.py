@@ -3,6 +3,7 @@ import shlex
 from typing import Annotated
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
+
 mcp = FastMCP()
 
 @mcp.tool(name="run_shell", description="run a shell command")
@@ -24,6 +25,7 @@ def run_shell_command_by_popen(command):
     p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
     stdout, stderr = p.communicate()
     return stdout, stderr
+
 
 if __name__ == '__main__':
     mcp.run(transport="stdio")
