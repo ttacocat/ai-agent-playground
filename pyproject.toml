@@ -21,6 +21,7 @@ dependencies = [
     "langgraph-checkpoint-redis>=0.5.2",
     "openai>=2.53.0",
     "pydantic>=2.13.4",
+    "pymysql>=1.2.3",
     "python-dotenv>=1.2.2",
     "selenium>=4.49.0",
 ]

@@ -9,6 +9,7 @@ from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from ai_agent_test.app.code_agent.model.model import qwen_llm
 from ai_agent_test.app.code_agent.tools.browser_tools import get_stdio_browser_tools
 from ai_agent_test.app.code_agent.tools.file_tools import file_tools
+from ai_agent_test.app.code_agent.tools.mysql_tools import get_stdio_mysql_tools
 from ai_agent_test.app.code_agent.tools.rag_self_tools import get_stdio_rag_self_tools
 from ai_agent_test.app.code_agent.tools.terminal_tools import get_stdio_terminal_tools
 from ai_agent_test.app.code_agent.tools.vm import get_stdio_vm_tools
@@ -23,9 +24,10 @@ async def run_agent():
         # rag_tools = await get_stdio_rag_tools()
         rag_self_tools = await get_stdio_rag_self_tools()
         browser_tools = await get_stdio_browser_tools()
-        vm_tools = await  get_stdio_vm_tools()
+        vm_tools = await get_stdio_vm_tools()
+        mysql_tools = await get_stdio_mysql_tools()
         # tools = file_tools + terminal_tools + rag_self_tools + browser_tools + vm_tools
-        tools = vm_tools
+        tools = mysql_tools
         #方案二：提供一个rag工具，让智能体通过工具查询知识
         name = "bot"
         system_prompt = f"""
@@ -41,7 +43,7 @@ async def run_agent():
             system_prompt=system_prompt,
         )
 
-        config = RunnableConfig(configurable={"thread_id": "6"})
+        config = RunnableConfig(configurable={"thread_id": "11"})
 
         step = 0  # 一轮对话
         print("输入 exit / quit 退出对话\n")
