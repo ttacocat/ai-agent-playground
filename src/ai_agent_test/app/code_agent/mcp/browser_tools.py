@@ -52,13 +52,21 @@ def slim_html(html: str) -> str:
 
     return html_str
 
+# def build_driver() -> webdriver.Chrome:
+#     service = Service(executable_path="/Users/wxy/bin/chromedriver")
+#     options = Options()
+#     options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
+#
+#     driver = webdriver.Chrome(service=service, options=options)
+#     print(f"成功连接到Chrome浏览器，当前URL：{driver.current_url}")
+#     return driver
 def build_driver() -> webdriver.Chrome:
+    """直接启动一个新的 Chrome 浏览器窗口（不再连接 9222 调试端口）"""
     service = Service(executable_path="/Users/wxy/bin/chromedriver")
     options = Options()
-    options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
 
     driver = webdriver.Chrome(service=service, options=options)
-    print(f"成功连接到Chrome浏览器，当前URL：{driver.current_url}")
+    print("成功启动Chrome浏览器")
     return driver
 
 

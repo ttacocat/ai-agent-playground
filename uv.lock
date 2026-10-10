@@ -24,6 +24,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "langgraph-checkpoint-mongodb" },
     { name = "langgraph-checkpoint-redis" },
+    { name = "langgraph-supervisor" },
     { name = "openai" },
     { name = "pydantic" },
     { name = "pymysql" },
@@ -44,6 +45,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.2.10" },
     { name = "langgraph-checkpoint-mongodb", specifier = ">=0.4.0" },
     { name = "langgraph-checkpoint-redis", specifier = ">=0.5.2" },
+    { name = "langgraph-supervisor", specifier = ">=0.0.31" },
     { name = "openai", specifier = ">=2.53.0" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pymysql", specifier = ">=1.2.3" },
@@ -1141,6 +1143,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b4/2b/bd8ac26d4e97f6df88ef05ce5b6a38945a3903e1025d926f4752aa88aa97/langgraph_sdk-0.4.2.tar.gz", hash = "sha256:b88f0f5f6328ac0680d6790614a905b2bcfa257f2276dba4e38f0e86db0aa738", size = 348327, upload-time = "2026-06-01T17:51:19.856Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/05/aac507337cceae773c2cc9ab91eb6301963af7aeeb55b4217a00e15aff17/langgraph_sdk-0.4.2-py3-none-any.whl", hash = "sha256:75fa5096c1177ce39c847096a8fe3745ffd480ddb412995f836e9f5f884c43dd", size = 160521, upload-time = "2026-06-01T17:51:18.849Z" },
+]
+
+[[package]]
+name = "langgraph-supervisor"
+version = "0.0.31"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "langgraph" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/15/a0/6e9286a2e4a9ed8c9d299d0131b323cae376316a63286d2880031bb01082/langgraph_supervisor-0.0.31.tar.gz", hash = "sha256:0f71d5098fa1ac274423eff08750345450045c1e0dd2480ab7f3e5c1848f6016", size = 21910, upload-time = "2025-11-19T18:34:29.795Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/7f/bb73da8db36c96f32cdd0292f2cd75e2d671150b0d177575da560ad994a1/langgraph_supervisor-0.0.31-py3-none-any.whl", hash = "sha256:6bbe5311f536d38779766cc6f074005e3e892d37edbfd875731923221daa1889", size = 16505, upload-time = "2025-11-19T18:34:28.481Z" },
 ]
 
 [[package]]
