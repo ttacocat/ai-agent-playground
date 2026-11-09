@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Lint (ruff)
+        run: uv run ruff check src tests
+
+      # 单测 + 评测引擎测试均为离线：不需要任何 API 凭证。
+      # 真实模型的评测（uv run agent eval）需要密钥，不进 CI，本地跑。
+      - name: Tests
+        run: uv run pytest tests -q
