@@ -1,27 +1,23 @@
+from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 
 # ========== 三种 checkpointer 的写法对比(学习记录) ==========
-
 # --- 1. MemorySaver:纯内存,不落盘,进程结束/对象重建即丢失 ---
-from langgraph.checkpoint.memory import MemorySaver
 # memory = MemorySaver()
-
 # --- 2. RedisSaver:需要 Redis >= 8.0(或 Redis Stack),setup() 建索引 ---
 # from langgraph.checkpoint.redis import RedisSaver
 # with RedisSaver.from_conn_string("redis://localhost:6379") as memory:
 #     memory.setup()
-
 # --- 3. MongoDBSaver:当前使用的方案 ---
 from langgraph.checkpoint.mongodb import MongoDBSaver
 
-from langchain.agents import create_agent
-
 from ai_agent_test.app.code_agent.model.model import qwen_llm
 from ai_agent_test.app.code_agent.tools.file_tools import file_tools
+from ai_agent_test.config import settings
 
-MONGODB_URL = "mongodb://localhost:27017/?directConnection=true"
-MONGODB_DB = "chat"
+MONGODB_URL = settings.checkpoint.mongodb_url
+MONGODB_DB = settings.checkpoint.mongodb_db
 
 
 def creat_agent(checkpointer):

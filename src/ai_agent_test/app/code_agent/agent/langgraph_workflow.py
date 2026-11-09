@@ -1,8 +1,8 @@
 import os
 
 from langchain_core.prompt_values import StringPromptValue
-from langgraph.constants import START, END
-from langgraph.graph import StateGraph, MessagesState
+from langgraph.constants import END, START
+from langgraph.graph import MessagesState, StateGraph
 
 from ai_agent_test.app.code_agent.mcp.browser_tools import search_in_duckduckgo
 from ai_agent_test.app.code_agent.model.model import qwen_llm
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     })
 
     for s in results:
-        node_name = list(s)[0]
+        node_name = next(iter(s))
         update = s[node_name]
         print(f"[{node_name}]")
         if "keyword" in update:

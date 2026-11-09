@@ -7,27 +7,21 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 
 from ai_agent_test.app.code_agent.model.model import qwen_llm
-from ai_agent_test.app.code_agent.tools.browser_tools import get_stdio_browser_tools
-from ai_agent_test.app.code_agent.tools.file_tools import file_tools
 from ai_agent_test.app.code_agent.tools.mysql_tools import get_stdio_mysql_tools
-from ai_agent_test.app.code_agent.tools.rag_self_tools import get_stdio_rag_self_tools
-from ai_agent_test.app.code_agent.tools.terminal_tools import get_stdio_terminal_tools
-from ai_agent_test.app.code_agent.tools.vm import get_stdio_vm_tools
+from ai_agent_test.config import settings
+from ai_agent_test.guardrails import apply_guard
+from ai_agent_test.observability import build_context_middleware, build_tracer
 
 
 async def run_agent():
-    async with AsyncRedisSaver.from_conn_string("redis://localhost:6379") as memory:
+    async with AsyncRedisSaver.from_conn_string(settings.checkpoint.redis_url) as memory:
         await memory.asetup()
 
-        # shell_tools = await get_stdio_shell_tools()
-        terminal_tools = await get_stdio_terminal_tools()
-        # rag_tools = await get_stdio_rag_tools()
-        rag_self_tools = await get_stdio_rag_self_tools()
-        browser_tools = await get_stdio_browser_tools()
-        vm_tools = await get_stdio_vm_tools()
+        # 只加载实际用到的工具：每个 MCP server 都是一个子进程，
+        # 加载了不用等于白白拖慢启动
         mysql_tools = await get_stdio_mysql_tools()
-        # tools = file_tools + terminal_tools + rag_self_tools + browser_tools + vm_tools
-        tools = mysql_tools
+        # 危险操作在执行前过一道人工审批（destructive 才拦），并落审计日志
+        tools = apply_guard(mysql_tools)
         #方案二：提供一个rag工具，让智能体通过工具查询知识
         name = "bot"
         system_prompt = f"""
@@ -41,9 +35,13 @@ async def run_agent():
             checkpointer=memory,
             debug=False,
             system_prompt=system_prompt,
+            middleware=build_context_middleware(),
         )
 
         config = RunnableConfig(configurable={"thread_id": "11"})
+        tracer = build_tracer("chat-single")
+        if tracer:
+            config["callbacks"] = [tracer]
 
         step = 0  # 一轮对话
         print("输入 exit / quit 退出对话\n")
@@ -64,13 +62,9 @@ async def run_agent():
             # final_reply = None
             start_time = time.perf_counter()  # 本轮计时起点
 
-            #方案一：从rag阿里云百炼知识库中读取知识，并拼接到提示词中
-            # rag = query_rag_from_bailian(user_input)
-            prompt = f"""
-            # 要求
-            执行任务之前先试用 query_rag 工具查询知识库，根据知识库中的知识执行任务
-            用户问题：{user_input}
-            """
+            # 注：这里曾有一个拼好的 prompt 要求"先查 query_rag 再执行任务"，
+            # 但当前模式只加载了 mysql 工具、没有 rag 工具，那个提示词会诱导
+            # 模型去调用不存在的工具。要启用知识库前置，请改用 --mode supervisor。
             try:
                 async for chunk in agent.astream(
                     {"messages": [("user", user_input)]},
@@ -83,7 +77,7 @@ async def run_agent():
 
                         for msg in node_output["messages"]:
                             if node_name == "tools":
-                                print(f"🔄 【工具调用】工具执行结果")
+                                print("🔄 【工具调用】工具执行结果")
                                 print("-" * 60)
                                 print(f"{msg.name}: {msg.content}")
                                 print("-" * 60)
@@ -112,9 +106,14 @@ async def run_agent():
 
             except Exception as e:
                 elapsed = time.perf_counter() - start_time
-                print(f"❌ 状态: 执行出错")
+                print("❌ 状态: 执行出错")
                 print(f"⏱️ 执行时间: {elapsed:.2f}秒")
                 print(f"调用出错: {e}\n")
+
+        if tracer:
+            path = tracer.save()
+            if path:
+                print(f"trace 已写入：{path}\n查看方式：uv run agent trace")
 
 
 if __name__ == "__main__":

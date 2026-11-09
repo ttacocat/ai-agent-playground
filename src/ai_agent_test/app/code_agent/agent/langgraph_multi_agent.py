@@ -1,5 +1,5 @@
-from langchain_core.tools import tool
 from langchain.agents import create_agent
+from langchain_core.tools import tool
 from langgraph_supervisor import create_supervisor
 
 from ai_agent_test.app.code_agent.mcp.browser_tools import search_in_duckduckgo

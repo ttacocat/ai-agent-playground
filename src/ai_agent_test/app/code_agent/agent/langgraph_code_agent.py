@@ -8,11 +8,12 @@ from langgraph_supervisor import create_supervisor
 from ai_agent_test.app.code_agent.model.model import qwen_llm
 from ai_agent_test.app.code_agent.tools.browser_tools import get_stdio_browser_tools
 from ai_agent_test.app.code_agent.tools.file_tools import file_tools
-from ai_agent_test.app.code_agent.tools.shell_tools import get_stdio_shell_tools
 from ai_agent_test.app.code_agent.tools.terminal_tools import get_stdio_terminal_tools
 from ai_agent_test.app.code_agent.tools.vm import get_stdio_vm_tools
+from ai_agent_test.config import settings
+from ai_agent_test.guardrails import apply_guard
+from ai_agent_test.observability import build_context_middleware, build_tracer
 
-REDIS_URL = "redis://localhost:6379"
 TASK_TIMEOUT = 6000  # 单次任务最长等待秒数
 RECURSION_LIMIT = 60  # 防止 agent 无限循环调用工具
 
@@ -63,7 +64,7 @@ def print_update(namespace: tuple, update: dict) -> None:
 
 
 async def run_agent(thread_id: str = "default-thread"):
-    async with AsyncRedisSaver.from_conn_string(REDIS_URL) as memory:
+    async with AsyncRedisSaver.from_conn_string(settings.checkpoint.redis_url) as memory:
         await memory.asetup()
 
         print("正在加载工具...")
@@ -72,19 +73,22 @@ async def run_agent(thread_id: str = "default-thread"):
         browser_tools = await get_stdio_browser_tools()
         vm_tools = await get_stdio_vm_tools()
         tools = [*file_tools, *terminal_tools, *browser_tools, *vm_tools]
-        print(f"已加载 {len(tools)} 个工具")
+        tools = apply_guard(tools)
+        print(f"已加载 {len(tools)} 个工具（护栏：{settings.guard.approver}）")
 
         research_agent = create_agent(
             model=qwen_llm,
             tools=tools,
             name="research_expert",
             system_prompt=RESEARCH_PROMPT,
+            middleware=build_context_middleware(),
         )
         code_agent = create_agent(
             model=qwen_llm,
             tools=tools,
             name="code_expert",
             system_prompt=CODE_PROMPT,
+            middleware=build_context_middleware(),
         )
 
         workflow = create_supervisor(
@@ -99,6 +103,9 @@ async def run_agent(thread_id: str = "default-thread"):
             "configurable": {"thread_id": thread_id},
             "recursion_limit": RECURSION_LIMIT,
         }
+        tracer = build_tracer("chat-supervisor")
+        if tracer:
+            config["callbacks"] = [tracer]
 
         print("就绪。输入 exit 退出；行尾加 \\ 可换行继续输入。")
         while True:
@@ -128,6 +135,11 @@ async def run_agent(thread_id: str = "default-thread"):
                 print("\n[已中断当前任务]")
             except Exception as e:
                 print(f"\n[错误] {type(e).__name__}: {e}")
+
+        if tracer:
+            path = tracer.save()
+            if path:
+                print(f"\ntrace 已写入：{path}\n查看方式：uv run agent trace")
 
 
 if __name__ == "__main__":
