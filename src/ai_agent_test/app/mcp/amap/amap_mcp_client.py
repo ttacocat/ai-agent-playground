@@ -11,12 +11,7 @@ AMAP_MCP_KEY = os.getenv("AMAP_MCP_KEY", "")
 
 
 async def create_amap_mcp_client():
-    mcp_config = {
-        "amap-maps": {
-            "url": f"https://mcp.amap.com/sse?key={AMAP_MCP_KEY}",
-            "transport": "sse"
-        }
-    }
+    mcp_config = {"amap-maps": {"url": f"https://mcp.amap.com/sse?key={AMAP_MCP_KEY}", "transport": "sse"}}
 
     client = MultiServerMCPClient(mcp_config)
     tools = await client.get_tools()
@@ -46,9 +41,7 @@ async def create_and_run_agent():
     - 行程规划的结果要能够在高德app中展示，并集成到h5页面中
     """
 
-    result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": user_question}]}
-    )
+    result = await agent.ainvoke({"messages": [{"role": "user", "content": user_question}]})
 
     # 打印完整消息链，方便调试每一步工具调用
     for msg in result["messages"]:
@@ -62,6 +55,7 @@ async def create_and_run_agent():
     print(final_answer)
 
     return result
+
 
 # asyncio.run(create_amap_mcp_client())
 asyncio.run(create_and_run_agent())

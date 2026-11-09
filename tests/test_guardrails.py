@@ -44,9 +44,9 @@ def test_read_tool_allowed_without_confirm():
 # --------------------------------------------------------------------------- #
 # shell 内容扫描
 # --------------------------------------------------------------------------- #
-def test_shell_ls_is_write_not_destructive():
+def test_shell_ls_is_read_and_allowed():
     decision = assess("run_shell", {"command": "ls -la /tmp"})
-    assert decision.level is RiskLevel.WRITE
+    assert decision.level is RiskLevel.READ
     assert decision.action is Action.ALLOW
 
 

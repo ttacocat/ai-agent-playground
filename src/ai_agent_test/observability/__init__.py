@@ -6,10 +6,12 @@ from datetime import datetime
 from pathlib import Path
 
 from ai_agent_test.observability.context import ContextBudgetMiddleware, build_context_middleware, trim_messages
+from ai_agent_test.observability.summary import ContextSummaryMiddleware
 from ai_agent_test.observability.tracer import Span, Summary, Tracer, load_run, render, summarize
 
 __all__ = [
     "ContextBudgetMiddleware",
+    "ContextSummaryMiddleware",
     "Span",
     "Summary",
     "Tracer",

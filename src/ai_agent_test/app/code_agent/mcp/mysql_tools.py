@@ -9,11 +9,13 @@ from ai_agent_test.config import settings
 
 mcp = FastMCP()
 
+
 class Response(BaseModel):
     success: bool
     database: str
     table: str
     data: None | dict | list
+
 
 def get_connection(database: str | None = None):
     """按配置建立连接。连接串从环境变量读取，不在代码里出现明文口令。"""
@@ -29,6 +31,7 @@ def _quote_ident(name: str) -> str:
     所有拼接 SQL 标识符的地方都必须经过这里，避免表名成为注入入口。
     """
     return "`" + str(name).replace("`", "``") + "`"
+
 
 def execute_query(command, database=None, parmas: list | tuple | None = None):
     connection = get_connection(database)
@@ -52,15 +55,17 @@ def execute_query(command, database=None, parmas: list | tuple | None = None):
     finally:
         connection.close()
 
+
 @mcp.tool(name="mysql_list_databases", description="列举MySQL中包含哪些数据库")
 def mysql_list_databases():
     try:
         result = execute_query("show databases")
-        databases = [row['Database'] for row in result]
+        databases = [row["Database"] for row in result]
         return databases
     except Exception as e:
-        msg = f'mysql list databases error: {e!s}'
+        msg = f"mysql list databases error: {e!s}"
         raise Exception(msg)
+
 
 @mcp.tool(name="mysql_list_tables", description="获取指定数据库中的所有表")
 def mysql_list_tables(database):
@@ -68,44 +73,32 @@ def mysql_list_tables(database):
         result = execute_query("show tables", database=database)
         tables = [next(iter(row.values())) for row in result]
         print(tables)
-        return Response(
-            success=True,
-            database=database,
-            table='',
-            data=tables
-        )
+        return Response(success=True, database=database, table="", data=tables)
     except Exception as e:
-        msg = f'mysql list tables error: {e!s}'
+        msg = f"mysql list tables error: {e!s}"
         raise Exception(msg)
+
 
 @mcp.tool(name="mysql_describe_tables", description="获取表结构信息")
 def mysql_describe_tables(database, table):
     try:
         result = execute_query(f"DESCRIBE {_quote_ident(table)}", database=database)
-        return Response(
-            success=True,
-            database=database,
-            table=table,
-            data=result
-        )
+        return Response(success=True, database=database, table=table, data=result)
     except Exception as e:
-        msg = f'mysql describe tables error: {e!s}'
+        msg = f"mysql describe tables error: {e!s}"
         return msg
+
 
 @mcp.tool(name="mysql_execute_query", description="执行sql查询语句")
 def mysql_execute_query(command, database=None, parmas: list | None = None):
     try:
         params_tuple = tuple(parmas) if parmas else None
         result = execute_query(command, database=database, parmas=params_tuple)
-        return Response(
-            success=True,
-            database=database,
-            table='',
-            data=result
-        )
+        return Response(success=True, database=database, table="", data=result)
     except Exception as e:
-        msg = f'mysql execute_query error: {e!s}'
+        msg = f"mysql execute_query error: {e!s}"
         return msg
+
 
 @mcp.tool(name="mysql_insert_data", description="向指定数据库的表中插入一条数据")
 def mysql_insert_data(database: str, table: str, data: dict[str, str]):
@@ -118,14 +111,10 @@ def mysql_insert_data(database: str, table: str, data: dict[str, str]):
 
     try:
         result = execute_query(sql, database=database, parmas=tuple(data.values()))
-        return Response(
-            success=True,
-            database=database,
-            table=table,
-            data=result
-        )
+        return Response(success=True, database=database, table=table, data=result)
     except Exception as e:
-        return f'mysql insert data error: {e!s}'
+        return f"mysql insert data error: {e!s}"
+
 
 @mcp.tool(name="mysql_update_data", description="根据条件更新指定数据库表中的数据,where 中的多个条件用 AND 连接")
 def mysql_update_data(database: str, table: str, data: dict[str, str], where: dict[str, str]):
@@ -145,14 +134,10 @@ def mysql_update_data(database: str, table: str, data: dict[str, str], where: di
 
     try:
         result = execute_query(command, database=database, parmas=params)
-        return Response(
-            success=True,
-            database=database,
-            table=table,
-            data=result
-        )
+        return Response(success=True, database=database, table=table, data=result)
     except Exception as e:
-        return f'mysql update data error: {e!s}'
+        return f"mysql update data error: {e!s}"
+
 
 @mcp.tool(name="mysql_delete_data", description="根据条件删除指定数据库表中的数据,data 中的多个条件用 AND 连接")
 def mysql_delete_data(database: str, table: str, data: dict[str, str]):
@@ -165,14 +150,10 @@ def mysql_delete_data(database: str, table: str, data: dict[str, str]):
 
     try:
         result = execute_query(command, database=database, parmas=params)
-        return Response(
-            success=True,
-            database=database,
-            table=table,
-            data=result
-        )
+        return Response(success=True, database=database, table=table, data=result)
     except Exception as e:
-        return f'mysql delete data error: {e!s}'
+        return f"mysql delete data error: {e!s}"
+
 
 @mcp.tool(name="mysql_create_database", description="创建数据库,如果已存在则不重复创建")
 def mysql_create_database(database_name: str, charset: str = "utf8mb4"):
@@ -186,14 +167,10 @@ def mysql_create_database(database_name: str, charset: str = "utf8mb4"):
 
     try:
         execute_query(command)
-        return Response(
-            success=True,
-            database=database_name,
-            table='',
-            data={"charset": charset}
-        )
+        return Response(success=True, database=database_name, table="", data={"charset": charset})
     except Exception as e:
-        return f'mysql create database error: {e!s}'
+        return f"mysql create database error: {e!s}"
+
 
 @mcp.tool(
     name="mysql_create_table",
@@ -203,34 +180,45 @@ def mysql_create_database(database_name: str, charset: str = "utf8mb4"):
     ),
 )
 def mysql_create_table(
-    database: Annotated[str, Field(
-        description="要在哪个数据库中建表,该数据库必须已存在",
-        examples=["test"],
-    )],
-    table_name: Annotated[str, Field(
-        description="表名,只能包含字母、数字、下划线和 $",
-        examples=["user"],
-    )],
-    table_columns: Annotated[list[str], Field(
-        description=(
-            "建表语句中的字段定义列表,每个元素是一个字段(或索引/约束)的完整定义,"
-            "格式为 '字段名 类型 [约束] [COMMENT ...]'。不要包含外层括号和表名,也不要带分号"
+    database: Annotated[
+        str,
+        Field(
+            description="要在哪个数据库中建表,该数据库必须已存在",
+            examples=["test"],
         ),
-        examples=[[
-            "id INT PRIMARY KEY AUTO_INCREMENT COMMENT '主键'",
-            "name VARCHAR(50) NOT NULL COMMENT '姓名'",
-            "age INT COMMENT '年龄'",
-            "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'",
-        ]],
-        min_length=1,
-    )],
-    table_schema: Annotated[str, Field(
-        description=(
-            "表级选项,拼接在字段定义的右括号之后,如存储引擎、字符集、表注释。"
-            "不需要时保持默认值即可"
+    ],
+    table_name: Annotated[
+        str,
+        Field(
+            description="表名,只能包含字母、数字、下划线和 $",
+            examples=["user"],
         ),
-        examples=["ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表'"],
-    )] = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+    ],
+    table_columns: Annotated[
+        list[str],
+        Field(
+            description=(
+                "建表语句中的字段定义列表,每个元素是一个字段(或索引/约束)的完整定义,"
+                "格式为 '字段名 类型 [约束] [COMMENT ...]'。不要包含外层括号和表名,也不要带分号"
+            ),
+            examples=[
+                [
+                    "id INT PRIMARY KEY AUTO_INCREMENT COMMENT '主键'",
+                    "name VARCHAR(50) NOT NULL COMMENT '姓名'",
+                    "age INT COMMENT '年龄'",
+                    "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'",
+                ]
+            ],
+            min_length=1,
+        ),
+    ],
+    table_schema: Annotated[
+        str,
+        Field(
+            description=("表级选项,拼接在字段定义的右括号之后,如存储引擎、字符集、表注释。不需要时保持默认值即可"),
+            examples=["ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表'"],
+        ),
+    ] = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 ):
     if not database:
         return "mysql create table error: database is empty"
@@ -247,14 +235,10 @@ def mysql_create_table(
     try:
         execute_query(command, database=database)
         columns = execute_query(f"DESCRIBE `{table_name}`", database=database)
-        return Response(
-            success=True,
-            database=database,
-            table=table_name,
-            data=columns
-        )
+        return Response(success=True, database=database, table=table_name, data=columns)
     except Exception as e:
-        return f'mysql create table error: {e!s}'
+        return f"mysql create table error: {e!s}"
+
 
 @mcp.tool(
     name="mysql_execute_command",
@@ -267,19 +251,25 @@ def mysql_create_table(
     ),
 )
 def mysql_execute_command(
-    database: Annotated[str, Field(
-        description="要在哪个数据库中执行该语句,该数据库必须已存在",
-        examples=["test"],
-    )],
-    command: Annotated[str, Field(
-        description="要执行的单条完整 SQL 语句,不要带分号",
-        examples=[
-            "ALTER TABLE `user` ADD COLUMN `email` VARCHAR(100) COMMENT '邮箱'",
-            "ALTER TABLE `user` MODIFY COLUMN `age` SMALLINT",
-            "ALTER TABLE `user` DROP COLUMN `email`",
-            "CREATE INDEX idx_name ON `user` (`name`)",
-        ],
-    )],
+    database: Annotated[
+        str,
+        Field(
+            description="要在哪个数据库中执行该语句,该数据库必须已存在",
+            examples=["test"],
+        ),
+    ],
+    command: Annotated[
+        str,
+        Field(
+            description="要执行的单条完整 SQL 语句,不要带分号",
+            examples=[
+                "ALTER TABLE `user` ADD COLUMN `email` VARCHAR(100) COMMENT '邮箱'",
+                "ALTER TABLE `user` MODIFY COLUMN `age` SMALLINT",
+                "ALTER TABLE `user` DROP COLUMN `email`",
+                "CREATE INDEX idx_name ON `user` (`name`)",
+            ],
+        ),
+    ],
 ):
     if not database:
         return "mysql execute command error: database is empty"
@@ -292,14 +282,10 @@ def mysql_execute_command(
 
     try:
         result = execute_query(sql, database=database)
-        return Response(
-            success=True,
-            database=database,
-            table='',
-            data=result
-        )
+        return Response(success=True, database=database, table="", data=result)
     except Exception as e:
-        return f'mysql execute command error: {e!s}'
+        return f"mysql execute command error: {e!s}"
+
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

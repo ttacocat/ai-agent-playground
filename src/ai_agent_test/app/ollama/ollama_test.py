@@ -1,9 +1,7 @@
 from langchain_ollama import ChatOllama
 
 if __name__ == "__main__":
-    llm = ChatOllama(
-        model="llama3.1:8b"
-    )
+    llm = ChatOllama(model="llama3.1:8b")
     messages = [
         (
             "system",
@@ -15,4 +13,4 @@ if __name__ == "__main__":
     # print(res.content)
     res = llm.stream(messages)
     for chunk in res:
-        print(chunk.content, end = "")
+        print(chunk.content, end="")

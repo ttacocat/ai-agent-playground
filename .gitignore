@@ -16,3 +16,18 @@ wheels/
 
 # 评测报告（每次运行覆盖，不入库）
 src/ai_agent_test/evals/reports/*.md
+src/ai_agent_test/evals/reports/*.jsonl
+
+# 前端依赖与构建产物
+web/node_modules/
+web/dist/
+
+# 系统与编辑器文件
+.DS_Store
+.idea/
+.vscode/
+
+# 工具缓存
+.pytest_cache/
+.ruff_cache/
+.jbeval/

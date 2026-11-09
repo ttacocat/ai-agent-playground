@@ -56,10 +56,12 @@ def test_upload_skips_node_modules_and_git():
         copied.append(argv)
         return _fake_run(stdout="ok")
 
-    with patch.object(vm.subprocess, "run", side_effect=fake_run), \
-         patch.object(vm.os.path, "exists", return_value=True), \
-         patch.object(vm.os.path, "isdir", return_value=True), \
-         patch.object(vm.os, "walk") as mock_walk:
+    with (
+        patch.object(vm.subprocess, "run", side_effect=fake_run),
+        patch.object(vm.os.path, "exists", return_value=True),
+        patch.object(vm.os.path, "isdir", return_value=True),
+        patch.object(vm.os, "walk") as mock_walk,
+    ):
         mock_walk.return_value = [
             ("/proj", ["node_modules", ".git", "src"], ["README.md"]),
             ("/proj/src", [], ["main.py"]),

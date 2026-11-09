@@ -25,9 +25,7 @@ agent = create_agent(model=qwen_llm, tools=file_tools)
 
 # 把 multi_chat_prompt 渲染出的 ChatPromptValue，转成 code_agent 需要的 {"messages": [...]} 格式
 # —— 这是 RunnableLambda 最典型的用法：把两个类型不兼容的 Runnable "粘"在一起
-to_messages = RunnableLambda(
-    lambda inputs: {"messages": multi_chat_prompt.invoke(inputs).to_messages()}
-)
+to_messages = RunnableLambda(lambda inputs: {"messages": multi_chat_prompt.invoke(inputs).to_messages()})
 
 # 把 code_agent 返回的完整消息列表（dict），提取成最后一条 AI 回复的纯文本
 extract_text = RunnableLambda(lambda result: result["messages"][-1].content)
@@ -41,7 +39,7 @@ chain = to_messages | agent | extract_text
 chain_with_history = RunnableWithMessageHistory(
     runnable=chain,
     get_session_history=get_session_history,
-    input_messages_key="question",        # 对应 prompt 里的 {question}
+    input_messages_key="question",  # 对应 prompt 里的 {question}
     history_messages_key="chat_history",  # 对应 prompt 里的 MessagesPlaceholder("chat_history")
 )
 

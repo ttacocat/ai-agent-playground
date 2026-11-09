@@ -9,10 +9,7 @@ from ai_agent_test.app.qwen.common import llm
 
 
 async def mcp_playwright_client():
-    server_params = StdioServerParameters(
-        command="npx",
-        args=["-y", "@executeautomation/playwright-mcp-server"]
-    )
+    server_params = StdioServerParameters(command="npx", args=["-y", "@executeautomation/playwright-mcp-server"])
 
     async with stdio_client(server_params) as (read, write), ClientSession(read, write) as session:
         await session.initialize()
@@ -20,9 +17,7 @@ async def mcp_playwright_client():
         tools = await load_mcp_tools(session)
         print(tools)
         agent = create_agent(model=llm, tools=tools, debug=True)
-        response = await agent.ainvoke(
-            input={"messages": [("user", "在bing中查询北京今天的天气")]}
-        )
+        response = await agent.ainvoke(input={"messages": [("user", "在bing中查询北京今天的天气")]})
         messages = response["messages"]
 
         # 4. 遍历每条消息，根据类型打印不同内容
@@ -55,5 +50,6 @@ async def mcp_playwright_client():
             # 4.4 其他类型的消息（比如 SystemMessage）可根据需要处理
             else:
                 print(f"其他消息类型: {type(message).__name__}")
+
 
 asyncio.run(mcp_playwright_client())

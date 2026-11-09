@@ -1,41 +1,26 @@
+"""多智能体 chat 入口：supervisor（主管 LLM 分派）或 team（固定的 方案→实现→审查 流程）。
+
+两种架构的构建在 team.py，评测用的是同一套构建函数。
+"""
+
 import asyncio
 
-from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
-from langgraph_supervisor import create_supervisor
 
+from ai_agent_test.app.code_agent.agent.lead import build_lead
+from ai_agent_test.app.code_agent.agent.team import build_supervisor, build_team
 from ai_agent_test.app.code_agent.model.model import qwen_llm
 from ai_agent_test.app.code_agent.tools.browser_tools import get_stdio_browser_tools
 from ai_agent_test.app.code_agent.tools.file_tools import file_tools
 from ai_agent_test.app.code_agent.tools.terminal_tools import get_stdio_terminal_tools
 from ai_agent_test.app.code_agent.tools.vm import get_stdio_vm_tools
 from ai_agent_test.config import settings
-from ai_agent_test.guardrails import apply_guard
+from ai_agent_test.guardrails import apply_guard, drive, pending_approvals, terminal_ask
 from ai_agent_test.observability import build_context_middleware, build_tracer
 
 TASK_TIMEOUT = 6000  # 单次任务最长等待秒数
 RECURSION_LIMIT = 60  # 防止 agent 无限循环调用工具
-
-RESEARCH_PROMPT = (
-    "你是一个技术方案设计专家，专门负责设计技术方案。\n"
-    "要求：先阅读相关文件，再给出方案；方案包含目标、思路、涉及文件、实施步骤、风险点；"
-    "不要直接编写或修改代码，实现工作交给 code_expert。"
-)
-
-CODE_PROMPT = (
-    "你是一个代码实现专家，负责根据技术方案编写、修改并验证代码。\n"
-    "要求：严格按照 research_expert 的方案实现；修改后运行必要命令验证；"
-    "完成后简要说明改动了哪些文件。"
-)
-
-SUPERVISOR_PROMPT = (
-    "你是团队主管，管理两个专家：\n"
-    "- research_expert：负责技术方案设计，不写代码；\n"
-    "- code_expert：负责代码实现与验证。\n"
-    "流程：先让 research_expert 出方案，再让 code_expert 按方案实现。\n"
-    "每次只分配给一个专家，不要自己做具体工作。"
-)
 
 
 async def read_input(prompt: str = "\nuser：") -> str:
@@ -63,49 +48,69 @@ def print_update(namespace: tuple, update: dict) -> None:
         messages[-1].pretty_print()
 
 
-async def run_agent(thread_id: str = "default-thread"):
+def explore_model():
+    """EXPLORE_MODEL_NAME 配了就用它，否则返回 None（与主模型相同）。"""
+    if not settings.model.explore_name:
+        return None
+    from ai_agent_test.app.code_agent.model.model import build_chat_model
+
+    return build_chat_model(settings.model.explore_name)
+
+
+async def load_tools():
+    """chat 与 Web 服务共用的工具集：文件 + 终端 + 浏览器 + 虚拟机，全部套上护栏。"""
+    terminal_tools = await get_stdio_terminal_tools()
+    browser_tools = await get_stdio_browser_tools()
+    vm_tools = await get_stdio_vm_tools()
+    from ai_agent_test.app.code_agent.tools.test_runner import build_run_tests_tool
+
+    run_tests = build_run_tests_tool(settings.paths.work_dir)
+    return apply_guard([*file_tools, run_tests, *terminal_tools, *browser_tools, *vm_tools])
+
+
+async def run_agent(thread_id: str = "default-thread", mode: str = "supervisor"):
     async with AsyncRedisSaver.from_conn_string(settings.checkpoint.redis_url) as memory:
         await memory.asetup()
 
         print("正在加载工具...")
-        # shell_tools = await get_stdio_shell_tools()
-        terminal_tools = await get_stdio_terminal_tools()
-        browser_tools = await get_stdio_browser_tools()
-        vm_tools = await get_stdio_vm_tools()
-        tools = [*file_tools, *terminal_tools, *browser_tools, *vm_tools]
-        tools = apply_guard(tools)
+        tools = await load_tools()
         print(f"已加载 {len(tools)} 个工具（护栏：{settings.guard.approver}）")
 
-        research_agent = create_agent(
-            model=qwen_llm,
-            tools=tools,
-            name="research_expert",
-            system_prompt=RESEARCH_PROMPT,
-            middleware=build_context_middleware(),
-        )
-        code_agent = create_agent(
-            model=qwen_llm,
-            tools=tools,
-            name="code_expert",
-            system_prompt=CODE_PROMPT,
-            middleware=build_context_middleware(),
-        )
+        if mode == "team":
+            app = build_team(qwen_llm, tools, middleware=build_context_middleware(qwen_llm), checkpointer=memory)
+        elif mode == "lead":
+            app = build_lead(
+                qwen_llm,
+                tools,
+                explore_model=explore_model(),
+                middleware=build_context_middleware(qwen_llm),
+                checkpointer=memory,
+            )
+        else:
+            app = build_supervisor(qwen_llm, tools, middleware=build_context_middleware(qwen_llm), checkpointer=memory)
+        print(f"架构：{mode}")
 
-        workflow = create_supervisor(
-            agents=[research_agent, code_agent],
-            model=qwen_llm,
-            prompt=SUPERVISOR_PROMPT,
-            output_mode="last_message",
-        )
-        app = workflow.compile(checkpointer=memory)
-
+        # 两种架构的图状态结构不同，同一个会话 ID 不能混用一份 checkpoint
+        checkpoint_thread = thread_id if mode == "supervisor" else f"{mode}:{thread_id}"
         config = {
-            "configurable": {"thread_id": thread_id},
+            "configurable": {"thread_id": checkpoint_thread},
             "recursion_limit": RECURSION_LIMIT,
         }
-        tracer = build_tracer("chat-supervisor")
+        tracer = build_tracer(f"chat-{mode}")
         if tracer:
             config["callbacks"] = [tracer]
+
+        stream_kwargs = {
+            "stream_mode": "updates",
+            "subgraphs": True,  # 同时输出子 agent 内部的每一步
+        }
+
+        # 审批挂起的状态在 checkpoint 里：上次退出时没批完的操作，这次接着批
+        leftover = await pending_approvals(app, config)
+        if leftover:
+            print(f"\n会话 {thread_id} 有 {len(leftover)} 个操作在等待确认，先处理它们。")
+            async for namespace, update in drive(app, None, config, terminal_ask, **stream_kwargs):
+                print_update(namespace, update)
 
         print("就绪。输入 exit 退出；行尾加 \\ 可换行继续输入。")
         while True:
@@ -122,11 +127,13 @@ async def run_agent(thread_id: str = "default-thread"):
             print("思考中...", flush=True)
             try:
                 async with asyncio.timeout(TASK_TIMEOUT):
-                    async for namespace, update in app.astream(
+                    # drive 在遇到危险操作时挂起图、问人、再恢复，直到本轮结束
+                    async for namespace, update in drive(
+                        app,
                         {"messages": [HumanMessage(content=user_input)]},
-                        config=config,
-                        stream_mode="updates",
-                        subgraphs=True,  # 同时输出子 agent 内部的每一步
+                        config,
+                        terminal_ask,
+                        **stream_kwargs,
                     ):
                         print_update(namespace, update)
             except TimeoutError:

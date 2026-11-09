@@ -26,6 +26,7 @@ def bailian() -> BailianConfig:
 
 mcp = FastMCP()
 
+
 def create_client() -> bailian_client.Client:
     cfg = bailian()
     config = openapi_models.Config(
@@ -44,7 +45,7 @@ def retrieve_index(client, workspace_id, index_id, query):
 
 @mcp.tool(name="query_rag", description="从百炼平台查询知识库信息")
 def query_rag_from_bailian(
-    query: Annotated[str, Field(description="访问知识库查询的内容", examples="终端的操作规范")]
+    query: Annotated[str, Field(description="访问知识库查询的内容", examples="终端的操作规范")],
 ) -> str:
     cfg = bailian()
     client = create_client()
@@ -115,9 +116,8 @@ def add_file_to_bailian_category(client, lease_id, parser, category_id, workspac
 
 
 def describe_file(client, workspace_id, file_id):
-    return client.describe_file_with_options(
-        workspace_id, file_id, {}, util_models.RuntimeOptions()
-    )
+    return client.describe_file_with_options(workspace_id, file_id, {}, util_models.RuntimeOptions())
+
 
 def upload_rag_file_to_bailian(client, workspace_id, category_id, file_path):
     """
@@ -136,9 +136,7 @@ def upload_rag_file_to_bailian(client, workspace_id, category_id, file_path):
     upload_file_to_bailian(upload_url, headers, file_path)
 
     log_step("③ 将文件添加到指定分类")
-    add_file_result = add_file_to_bailian_category(
-        client, lease_id, bailian().parser, category_id, workspace_id
-    )
+    add_file_result = add_file_to_bailian_category(client, lease_id, bailian().parser, category_id, workspace_id)
     file_id = add_file_result.body.data.file_id
     print(f"  • 文件ID: {file_id}")
 
@@ -148,6 +146,7 @@ def upload_rag_file_to_bailian(client, workspace_id, category_id, file_path):
 
     print(f"✅ 上传完成，共耗时 {time.monotonic() - start:.1f}s")
     return file_id
+
 
 def create_index(
     client,
@@ -169,11 +168,13 @@ def create_index(
     )
     return client.create_index_with_options(workspace_id, request, headers, runtime)
 
+
 def submit_index(client, workspace_id, index_id):
     headers = {}
     runtime = util_models.RuntimeOptions()
     submit_request = bailian_models.SubmitIndexJobRequest(index_id=index_id)
     return client.submit_index_job_with_options(workspace_id, submit_request, headers, runtime)
+
 
 def get_index_job_status(client, workspace_id, index_id, job_id):
     headers = {}
@@ -185,12 +186,14 @@ def get_index_job_status(client, workspace_id, index_id, job_id):
     )
     return client.get_index_job_status_with_options(workspace_id, get_index_job_status_request, headers, runtime)
 
+
 def list_indices(client, workspace_id):
     headers = {}
     runtime = util_models.RuntimeOptions()
     list_indices_request = bailian_models.ListIndicesRequest()
 
     return client.list_indices_with_options(workspace_id, list_indices_request, headers, runtime)
+
 
 def submit_index_add_documents_job(client, workspace_id, index_id, file_id, source_type="DATA_CENTER_FILE"):
     headers = {}
@@ -203,6 +206,7 @@ def submit_index_add_documents_job(client, workspace_id, index_id, file_id, sour
     return client.submit_index_add_documents_job_with_options(
         workspace_id, submit_index_add_documents_job_request, headers, runtime
     )
+
 
 def add_document_to_index(client, workspace_id, category_id, file_id):
     job_result = submit_index_add_documents_job(client, workspace_id, category_id, file_id)

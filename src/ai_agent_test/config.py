@@ -34,10 +34,7 @@ class ConfigError(RuntimeError):
 def _require(key: str) -> str:
     value = os.getenv(key, "").strip()
     if not value:
-        raise ConfigError(
-            f"缺少环境变量 {key}。请执行 `cp .env.example .env`，"
-            f"然后填写 {key} 后重试。"
-        )
+        raise ConfigError(f"缺少环境变量 {key}。请执行 `cp .env.example .env`，然后填写 {key} 后重试。")
     return value
 
 
@@ -76,6 +73,7 @@ class ModelConfig:
     temperature: float
     timeout: float
     max_retries: int
+    explore_name: str = ""  # lead 架构里探索子 agent 用的模型；留空 = 与主模型相同
 
 
 @dataclass(frozen=True)
@@ -123,9 +121,7 @@ class GuardConfig:
 
     def validate(self) -> None:
         if self.approver not in {"interactive", "deny", "allow"}:
-            raise ConfigError(
-                f"GUARD_APPROVER 只支持 interactive / deny / allow，当前值为 {self.approver!r}"
-            )
+            raise ConfigError(f"GUARD_APPROVER 只支持 interactive / deny / allow，当前值为 {self.approver!r}")
 
 
 @dataclass(frozen=True)
@@ -140,10 +136,20 @@ class TraceConfig:
 
 @dataclass(frozen=True)
 class ContextConfig:
-    """模型单次请求的上下文预算。max_chars<=0 关闭裁剪。"""
+    """模型单次请求的上下文预算。max_chars<=0 关闭。
+
+    strategy=summarize：超预算时把早期对话压成摘要（多一次 LLM 调用，只在超预算时发生）；
+    strategy=trim：直接丢弃中间的消息（零额外成本，但会丢信息）。
+    """
 
     max_chars: int
     keep_last: int
+    strategy: str = "summarize"
+    summary_max_chars: int = 2000
+
+    def validate(self) -> None:
+        if self.strategy not in {"summarize", "trim"}:
+            raise ConfigError(f"CONTEXT_STRATEGY 只支持 summarize / trim，当前值为 {self.strategy!r}")
 
 
 @dataclass(frozen=True)
@@ -180,6 +186,7 @@ class Settings:
             temperature=float(_optional("MODEL_TEMPERATURE", "0")),
             timeout=float(_optional("MODEL_TIMEOUT", "120")),
             max_retries=_as_int("MODEL_MAX_RETRIES", 2),
+            explore_name=_optional("EXPLORE_MODEL_NAME"),
         )
 
     @cached_property
@@ -209,15 +216,11 @@ class Settings:
     def checkpoint(self) -> CheckpointConfig:
         backend = _optional("CHECKPOINT_BACKEND", "redis").lower()
         if backend not in {"redis", "mongodb", "file"}:
-            raise ConfigError(
-                f"CHECKPOINT_BACKEND 只支持 redis / mongodb / file，当前值为 {backend!r}"
-            )
+            raise ConfigError(f"CHECKPOINT_BACKEND 只支持 redis / mongodb / file，当前值为 {backend!r}")
         return CheckpointConfig(
             backend=backend,
             redis_url=_optional("REDIS_URL", "redis://localhost:6379"),
-            mongodb_url=_optional(
-                "MONGODB_URL", "mongodb://localhost:27017/?directConnection=true"
-            ),
+            mongodb_url=_optional("MONGODB_URL", "mongodb://localhost:27017/?directConnection=true"),
             mongodb_db=_optional("MONGODB_DB", "chat"),
         )
 
@@ -228,9 +231,7 @@ class Settings:
         return PathsConfig(
             project_root=PROJECT_ROOT,
             work_dir=_as_path(_optional("WORK_DIR", ".temp")),
-            checkpoint_dir=_as_path(
-                _optional("CHECKPOINT_DIR", str(Path(".temp") / "checkpoint"))
-            ),
+            checkpoint_dir=_as_path(_optional("CHECKPOINT_DIR", str(Path(".temp") / "checkpoint"))),
             chromedriver=chromedriver,
         )
 
@@ -259,6 +260,8 @@ class Settings:
         return ContextConfig(
             max_chars=_as_int("CONTEXT_MAX_CHARS", 24000),
             keep_last=_as_int("CONTEXT_KEEP_LAST", 12),
+            strategy=_optional("CONTEXT_STRATEGY", "summarize").lower(),
+            summary_max_chars=_as_int("CONTEXT_SUMMARY_MAX_CHARS", 2000),
         )
 
     @cached_property

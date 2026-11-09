@@ -14,8 +14,9 @@ key_reply_user = "key_reply_user"
 
 class WorkflowState(MessagesState):
     """继承 MessagesState，在 messages 之外扩展自己的字段"""
-    keyword: str          # 提取出的搜索关键词
-    search_result: str    # duckduckgo 的搜索结果
+
+    keyword: str  # 提取出的搜索关键词
+    search_result: str  # duckduckgo 的搜索结果
 
 
 def node_extract_query_keyword(state: WorkflowState):
@@ -37,13 +38,15 @@ def node_search_duck(state: WorkflowState):
 def node_reply_user(state: WorkflowState):
     question = state["messages"][0].content
     search_result = state["search_result"]
-    result = qwen_llm.invoke(input=f"""
+    result = qwen_llm.invoke(
+        input=f"""
 # 要求
 请结合duckduckgo搜索的结果，回答用户的问题：{question}
 
 搜索结果：
 {search_result}
-""")
+"""
+    )
     return {"messages": [result]}
 
 
@@ -52,9 +55,9 @@ def output_graph_image(graph, filename):
         png_data = graph.get_graph().draw_mermaid_png()
 
         output_file_dir = os.path.dirname(__file__)
-        output_file_path = os.path.join(output_file_dir, filename + '.png')
+        output_file_path = os.path.join(output_file_dir, filename + ".png")
 
-        with open(output_file_path, 'wb') as f:
+        with open(output_file_path, "wb") as f:
             f.write(png_data)
 
         print(f"文件写入成功：{output_file_path}")
@@ -77,9 +80,7 @@ graph = state_graph.compile()
 if __name__ == "__main__":
     # output_graph_image(graph, "langgraph_workflow")
 
-    results = graph.stream({
-        "messages": [("user", "北京今天的天气如何？")]
-    })
+    results = graph.stream({"messages": [("user", "北京今天的天气如何？")]})
 
     for s in results:
         node_name = next(iter(s))

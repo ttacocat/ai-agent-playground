@@ -20,9 +20,7 @@ def _conversation(length: int = 3) -> list:
     messages = [SystemMessage(content="你是工程师助手")]
     for i in range(length):
         messages.append(HumanMessage(content=f"第 {i} 个任务：" + "很长的描述" * 40))
-        messages.append(
-            AIMessage(content="", tool_calls=[{"name": "run_shell", "args": {}, "id": f"call-{i}"}])
-        )
+        messages.append(AIMessage(content="", tool_calls=[{"name": "run_shell", "args": {}, "id": f"call-{i}"}]))
         messages.append(ToolMessage(content="命令输出 " * 100, tool_call_id=f"call-{i}", name="run_shell"))
     return messages
 

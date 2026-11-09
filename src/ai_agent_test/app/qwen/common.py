@@ -16,9 +16,7 @@ llm = ChatOpenAI(
 system_prompt = ChatMessagePromptTemplate.from_template(
     role="system", template="你是{role}，擅长回答{domain}领域的问题。"
 )
-human_prompt = ChatMessagePromptTemplate.from_template(
-    role="user", template="用户问题：{question}"
-)
+human_prompt = ChatMessagePromptTemplate.from_template(role="user", template="用户问题：{question}")
 chat_prompt_template = ChatPromptTemplate.from_messages([system_prompt, human_prompt])
 
 file_toolkit = FileManagementToolkit(root_dir=str(settings.paths.work_dir))

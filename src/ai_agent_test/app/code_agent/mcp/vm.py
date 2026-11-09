@@ -59,9 +59,7 @@ def list_files_in_vm(
 
 @mcp.tool(name="write_file_to_vm", description="向虚拟机中写入指定文件")
 def write_file_to_vm(
-    file_path: Annotated[
-        str, Field(description="写入虚拟机中的文件地址", examples=["/home/user/uploads/index.html"])
-    ],
+    file_path: Annotated[str, Field(description="写入虚拟机中的文件地址", examples=["/home/user/uploads/index.html"])],
     content: Annotated[str, Field(description="写入虚拟机中的文件内容", examples=["<div> hello </div>"])],
 ):
     with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8") as tmp_file:

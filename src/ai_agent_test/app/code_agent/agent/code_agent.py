@@ -9,7 +9,7 @@ from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from ai_agent_test.app.code_agent.model.model import qwen_llm
 from ai_agent_test.app.code_agent.tools.mysql_tools import get_stdio_mysql_tools
 from ai_agent_test.config import settings
-from ai_agent_test.guardrails import apply_guard
+from ai_agent_test.guardrails import apply_guard, drive, terminal_ask
 from ai_agent_test.observability import build_context_middleware, build_tracer
 
 
@@ -22,7 +22,7 @@ async def run_agent():
         mysql_tools = await get_stdio_mysql_tools()
         # 危险操作在执行前过一道人工审批（destructive 才拦），并落审计日志
         tools = apply_guard(mysql_tools)
-        #方案二：提供一个rag工具，让智能体通过工具查询知识
+        # 方案二：提供一个rag工具，让智能体通过工具查询知识
         name = "bot"
         system_prompt = f"""
         # 角色
@@ -35,7 +35,7 @@ async def run_agent():
             checkpointer=memory,
             debug=False,
             system_prompt=system_prompt,
-            middleware=build_context_middleware(),
+            middleware=build_context_middleware(qwen_llm),
         )
 
         config = RunnableConfig(configurable={"thread_id": "11"})
@@ -55,7 +55,7 @@ async def run_agent():
                 break
 
             step += 1
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"📊 第 {step} 轮对话:")
             print("-" * 60)
 
@@ -66,9 +66,11 @@ async def run_agent():
             # 但当前模式只加载了 mysql 工具、没有 rag 工具，那个提示词会诱导
             # 模型去调用不存在的工具。要启用知识库前置，请改用 --mode supervisor。
             try:
-                async for chunk in agent.astream(
+                async for chunk in drive(
+                    agent,
                     {"messages": [("user", user_input)]},
-                    config=config,
+                    config,
+                    terminal_ask,
                     stream_mode="updates",
                 ):
                     for node_name, node_output in chunk.items():

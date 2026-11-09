@@ -29,17 +29,14 @@ def web_search(query: str) -> str:
 # 子 Agent
 # ---------------------------------------------------------------------------
 math_agent = create_agent(
-    model=qwen_llm,
-    tools=[add, multiply],
-    name="math_expert",
-    system_prompt="你是一个数学专家，一次执行只使用一个工具"
+    model=qwen_llm, tools=[add, multiply], name="math_expert", system_prompt="你是一个数学专家，一次执行只使用一个工具"
 )
 
 research_agent = create_agent(
     model=qwen_llm,
     tools=[web_search],
     name="research_expert",
-    system_prompt="你是一个世界级的调研专家，能够使用web_search工具，不要使用任何数学工具"
+    system_prompt="你是一个世界级的调研专家，能够使用web_search工具，不要使用任何数学工具",
 )
 
 # ---------------------------------------------------------------------------
@@ -52,7 +49,7 @@ workflow = create_supervisor(
         "You are a team supervisor managing a research expert and a math expert. "
         "For current events, use research_agent. "
         "For math problems, use math_agent."
-    )
+    ),
 )
 
 # create_supervisor 返回的是 StateGraph，需要 compile 后才能运行
@@ -60,11 +57,9 @@ app = workflow.compile()
 
 
 if __name__ == "__main__":
-    result = app.invoke({
-        "messages": [
-            {"role": "user", "content": "北京今天的天气如何？另外帮我算一下 (3 + 5) * 12 等于多少？"}
-        ]
-    })
+    result = app.invoke(
+        {"messages": [{"role": "user", "content": "北京今天的天气如何？另外帮我算一下 (3 + 5) * 12 等于多少？"}]}
+    )
 
     for message in result["messages"]:
         message.pretty_print()

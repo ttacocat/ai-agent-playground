@@ -25,22 +25,14 @@ client = OpenAI(
     base_url="https://.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
 )
 messages = [{"role": "user", "content": "你是谁"}]
-completion = client.chat.completions.create(
-    model="qwq-plus",
-    messages=messages,
-    stream=True
-)
+completion = client.chat.completions.create(model="qwq-plus", messages=messages, stream=True)
 is_answering = False  # 是否进入回复阶段
 print("\n" + "=" * 20 + "思考过程" + "=" * 20)
 for chunk in completion:
     if chunk.choices:
         delta = chunk.choices[0].delta
         # 只收集思考内容
-        if (
-            hasattr(delta, "reasoning_content")
-            and delta.reasoning_content is not None
-            and not is_answering
-        ):
+        if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None and not is_answering:
             print(delta.reasoning_content, end="", flush=True)
         # 收到content，开始进行回复
         if hasattr(delta, "content") and delta.content:

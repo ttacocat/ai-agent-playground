@@ -14,14 +14,20 @@ from langchain_core.tools import BaseTool, StructuredTool
 
 from ai_agent_test.guardrails.approval import Approver, DenyAllApprover
 from ai_agent_test.guardrails.audit import AuditLog, NullAuditLog
+from ai_agent_test.guardrails.memory import DenialMemory
 from ai_agent_test.guardrails.policy import Decision, assess
 
 OutcomeHook = Callable[[Decision, str], None]
 
+# 第一版的结尾是"请改用更安全的方式"。评测里模型把它理解成"换个写法达成同样的效果"：
+# DELETE FROM user WHERE 1=1 被拒后，改成 DELETE FROM user WHERE id IN (1,2,3) 把表清空了。
+# 用户拒绝的是意图，不是写法，提示必须说清楚这一点。
 BLOCKED_TEMPLATE = (
     "⛔ 操作被安全护栏拦截：{tool}（风险等级 {level}，原因：{reason}）。\n"
-    "本次调用未执行，未产生任何影响。请改用更安全的方式；"
-    "若确需执行，请提示用户在终端手动完成。"
+    "本次调用未执行，未产生任何影响。\n"
+    "不要用其他写法、其他工具或分多步来达成同样的效果——用户拒绝的是这个操作的意图，"
+    "换一种方式绕过同样会被拦截。请停止这部分操作，向用户说明情况；"
+    "确实需要执行的话，由用户自己在终端里完成。"
 )
 
 
@@ -47,12 +53,17 @@ def guard_tool(
     approver: Approver | None = None,
     audit: AuditLog | None = None,
     on_decision: OutcomeHook | None = None,
+    memory: DenialMemory | None = None,
 ) -> BaseTool:
     approver = approver or DenyAllApprover()
     audit = audit or NullAuditLog()
+    memory = memory if memory is not None else DenialMemory()
+
+    def _judge(kwargs: dict) -> Decision:
+        return memory.escalate(assess(tool.name, kwargs), kwargs)
 
     async def _run(**kwargs: Any) -> Any:
-        decision = assess(tool.name, kwargs)
+        decision = _judge(kwargs)
 
         if not decision.needs_approval:
             audit.write(decision, "executed")
@@ -67,11 +78,12 @@ def guard_tool(
             on_decision(decision, outcome)
         if approved:
             return _normalize_result(tool, await tool.ainvoke(kwargs))
+        memory.remember(decision, kwargs)
         return _blocked_message(decision, denied=outcome == "denied")
 
     def _run_sync(**kwargs: Any) -> Any:
         # 同步路径极少用到（agent 走 ainvoke），但保留以免 StructuredTool 校验收不到 func
-        decision = assess(tool.name, kwargs)
+        decision = _judge(kwargs)
         if not decision.needs_approval:
             audit.write(decision, "executed")
             if on_decision:
@@ -80,6 +92,7 @@ def guard_tool(
         audit.write(decision, "blocked")
         if on_decision:
             on_decision(decision, "blocked")
+        memory.remember(decision, kwargs)
         return _blocked_message(decision, denied=False)
 
     return StructuredTool(
@@ -98,5 +111,8 @@ def guard_tools(
     approver: Approver | None = None,
     audit: AuditLog | None = None,
     on_decision: OutcomeHook | None = None,
+    memory: DenialMemory | None = None,
 ) -> list[BaseTool]:
-    return [guard_tool(t, approver=approver, audit=audit, on_decision=on_decision) for t in tools]
+    """一组工具共享同一份拒绝记忆：用 SQL 工具被拒的表，换结构化删除工具也绕不过去。"""
+    memory = memory if memory is not None else DenialMemory()
+    return [guard_tool(t, approver=approver, audit=audit, on_decision=on_decision, memory=memory) for t in tools]

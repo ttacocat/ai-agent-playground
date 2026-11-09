@@ -17,7 +17,7 @@ mcp = FastMCP(name="self_rag")
 
 @mcp.tool(name="query_rag", description="从百炼平台查询知识库信息")
 def query_rag_from_bailian(
-    query: Annotated[str, Field(description="访问知识库查询的内容", examples=["终端的操作规范"])]
+    query: Annotated[str, Field(description="访问知识库查询的内容", examples=["终端的操作规范"])],
 ) -> str:
     cfg = bailian()
     client = create_client()
@@ -38,7 +38,7 @@ def upload_rag_from_bailian(
             description="本地知识文件的路径，推荐传绝对路径",
             examples=["<仓库根目录>/.temp/knowledge.md"],
         ),
-    ]
+    ],
 ) -> str:
     cfg = bailian()
     client = create_client()

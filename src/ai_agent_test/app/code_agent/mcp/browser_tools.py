@@ -21,9 +21,19 @@ def slim_html(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
 
     noisy_tags = [
-        "script", "style", "link", "meta",
-        "symbol", "path", "canvas", "svg",
-        "noscript", "iframe", "footer", "header", "nav"
+        "script",
+        "style",
+        "link",
+        "meta",
+        "symbol",
+        "path",
+        "canvas",
+        "svg",
+        "noscript",
+        "iframe",
+        "footer",
+        "header",
+        "nav",
     ]
     for tag in soup(noisy_tags):
         tag.decompose()
@@ -53,6 +63,7 @@ def slim_html(html: str) -> str:
     html_str = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
 
     return html_str
+
 
 def build_driver() -> webdriver.Chrome:
     """启动一个新的 Chrome。chromedriver 路径从 CHROMEDRIVER_PATH 读取，
@@ -87,15 +98,11 @@ def search_in_duckduckgo(query: str) -> str | None:
         driver.set_window_size(1920, 1080)
         driver.get("https://html.duckduckgo.com/html/")
 
-        search_box = WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located((By.NAME, "q"))
-        )
+        search_box = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.NAME, "q")))
         search_box.send_keys(query)
         search_box.submit()
 
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div.result"))
-        )
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.result")))
 
         page_text_list = []
         max_pages = 3
@@ -123,9 +130,7 @@ def search_in_duckduckgo(query: str) -> str | None:
 
             try:
                 next_button = WebDriverWait(driver, 5).until(
-                    EC.element_to_be_clickable(
-                        (By.CSS_SELECTOR, "input[value='Next'], .result--more__btn")
-                    )
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "input[value='Next'], .result--more__btn"))
                 )
             except Exception:
                 print("没有更多页了，提前结束翻页")
@@ -135,9 +140,7 @@ def search_in_duckduckgo(query: str) -> str | None:
 
             if old_first_result is not None:
                 WebDriverWait(driver, 10).until(EC.staleness_of(old_first_result))
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.result"))
-            )
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.result")))
 
         return "\n\n---第X页分隔---\n\n".join(page_text_list)
 

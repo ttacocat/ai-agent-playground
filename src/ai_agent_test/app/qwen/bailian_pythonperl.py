@@ -20,10 +20,6 @@ user_input = f"""
 2. 写一个企业的官网
 """
 
-res = agent.invoke({
-    "messages": [
-        {"role": "user", "content": user_input}
-    ]
-})
+res = agent.invoke({"messages": [{"role": "user", "content": user_input}]})
 
-print(res["messages"][-1].content )
+print(res["messages"][-1].content)

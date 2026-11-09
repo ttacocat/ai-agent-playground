@@ -7,6 +7,8 @@
 - ``destructive`` 可能造成不可逆影响，必须人工确认
 
 判定看两件事：**工具本身的默认风险** + **参数内容**。
+参数内容的判定是白名单思路：shell 只放行认识的只读命令，SQL 只放行解析得出的
+只读语句，其余一律要人确认（细节见 shell_rules.py / sql_rules.py）。
 
 只看工具名是不够的：``run_shell("ls")`` 和 ``run_shell("rm -rf /")`` 风险差三个
 数量级；``mysql_execute_query("SELECT 1")`` 和 ``...("DROP TABLE user")`` 同理。
@@ -17,21 +19,27 @@
 
 from __future__ import annotations
 
-import re
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from ai_agent_test.guardrails.levels import RiskLevel
+from ai_agent_test.guardrails.shell_rules import scan_shell
+from ai_agent_test.guardrails.sql_rules import scan_sql
 
-class RiskLevel(StrEnum):
-    READ = "read"
-    WRITE = "write"
-    DESTRUCTIVE = "destructive"
-
-    @property
-    def rank(self) -> int:
-        return {"read": 0, "write": 1, "destructive": 2}[self.value]
+__all__ = [
+    "Action",
+    "Decision",
+    "RiskLevel",
+    "assess",
+    "baseline_level",
+    "describe",
+    "is_content_decided",
+    "scan_shell",
+    "scan_sql",
+]
 
 
 class Action(StrEnum):
@@ -63,6 +71,12 @@ _READ_TOOLS = {
     "get_terminal_full_text",
     "list_terminal_windows",
     "list_files",
+    "file_search",
+    # 只接受"测哪个路径"一个参数，命令写死，模型没法借它执行任意命令
+    "run_tests",
+    # lead 架构的子 agent 工具：子 agent 只拿只读工具
+    "explore",
+    "review",
 }
 
 _WRITE_TOOLS = {
@@ -75,6 +89,7 @@ _WRITE_TOOLS = {
     # 下面几个的风险完全由参数内容决定，见 _CONTENT_DECIDED_TOOLS
     "run_shell",
     "mysql_execute_query",
+    "mysql_execute_command",
     "execute_command",
 }
 
@@ -86,6 +101,9 @@ _DESTRUCTIVE_TOOLS = {
     "send_terminal_keyboard_key",
     "execute_script_in_vm",
     "delete_file",
+    # FileManagementToolkit 里删除工具的真实名字是 file_delete：第一版只写了 delete_file，
+    # 真正的删除工具落进"未知工具 = write"，不经确认就执行了
+    "file_delete",
     "move_file",
 }
 
@@ -95,8 +113,21 @@ _READ_PREFIXES = ("list_", "get_", "read_", "search_", "show_", "describe_", "qu
 # 这几个工具参数本身就是一段可执行文本：等级 **由内容决定**，不叠加默认值。
 # 否则 run_shell 会永远被判 destructive，`ls` 都要人确认一次，护栏就成了噪音。
 _SHELL_LIKE_TOOLS = {"run_shell", "run_script_in_terminal", "execute_command", "execute_script_in_vm"}
-_SQL_LIKE_TOOLS = {"mysql_execute_query"}
-_CONTENT_DECIDED_TOOLS = {"run_shell", "execute_command", "mysql_execute_query"}
+_SQL_LIKE_TOOLS = {"mysql_execute_query", "mysql_execute_command"}
+_CONTENT_DECIDED_TOOLS = {"run_shell", "execute_command", "mysql_execute_query", "mysql_execute_command"}
+
+
+def is_content_decided(tool_name: str) -> bool:
+    """该工具的风险等级是否完全由参数内容决定（同一个工具既能只读也能删库）。"""
+    return tool_name in _CONTENT_DECIDED_TOOLS
+
+
+# 给人看的说明：会出现在审批面板和审计日志里
+_BASELINE_REASONS = {
+    RiskLevel.READ: "{tool} 是只读工具",
+    RiskLevel.WRITE: "{tool} 会写入数据",
+    RiskLevel.DESTRUCTIVE: "{tool} 可能删除数据或产生不可逆的影响",
+}
 
 
 def baseline_level(tool_name: str) -> RiskLevel:
@@ -113,64 +144,8 @@ def baseline_level(tool_name: str) -> RiskLevel:
 
 
 # --------------------------------------------------------------------------- #
-# 内容扫描
+# 内容扫描：规则见 shell_rules.py（白名单 + 词法分段）与 sql_rules.py（AST）
 # --------------------------------------------------------------------------- #
-_SHELL_RULES: list[tuple[str, str]] = [
-    (r"\brm\b", "包含 rm 删除命令"),
-    (r"\bmkfs(\.\w+)?\b", "格式化文件系统"),
-    (r"\bdd\b[^\n]*\bof=", "dd 写裸设备"),
-    (r">\s*/dev/(sd|nvme|disk)", "重定向写入磁盘设备"),
-    (r"\b(shutdown|reboot|halt|poweroff)\b", "关机或重启"),
-    (r"\bchmod\s+(-[a-zA-Z]+\s+)*777\b", "权限放大到 777"),
-    (r"\bchown\s+-R\b", "递归改变属主"),
-    (r"\bgit\s+clean\s+-[a-zA-Z]*[fx]", "git clean 会删除未跟踪文件"),
-    (r"\bgit\s+reset\s+--hard\b", "git reset --hard 会丢弃改动"),
-    (r"\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(ba|z)?sh\b", "下载脚本直接管道执行"),
-    (r":\(\)\s*\{", "fork 炸弹"),
-    (r"\btruncate\s+-s\s*0\b", "清空文件内容"),
-    (r"\bkill(all)?\s+-9\b", "强杀进程"),
-    (r"\bdrop\s+(table|database)\b", "SQL 删除表或库"),
-]
-
-_SHELL_PATTERNS = [(re.compile(p, re.I), why) for p, why in _SHELL_RULES]
-
-
-def _strip_sql_comments(sql: str) -> str:
-    sql = re.sub(r"/\*.*?\*/", " ", sql, flags=re.S)
-    sql = re.sub(r"--[^\n]*", " ", sql)
-    return sql
-
-
-def _statement_count(sql: str) -> int:
-    body = sql.rstrip().rstrip(";").strip()
-    return body.count(";") + 1 if body else 0
-
-
-def scan_sql(sql: str) -> tuple[RiskLevel | None, str]:
-    """按第一条语句的关键字判定 SQL 风险。"""
-    body = _strip_sql_comments(sql).strip()
-    if not body:
-        return None, ""
-    if _statement_count(body) > 1:
-        return RiskLevel.DESTRUCTIVE, "包含多条语句（可能用分号接危险操作）"
-
-    first = body.split(None, 1)[0].upper()
-    if first in {"DROP", "TRUNCATE", "RENAME"}:
-        return RiskLevel.DESTRUCTIVE, f"{first} 语句不可回滚"
-    if first == "ALTER" and re.search(r"\bdrop\b", body, re.I):
-        return RiskLevel.DESTRUCTIVE, "ALTER TABLE ... DROP 会丢列或索引"
-    if first in {"DELETE", "UPDATE"} and not re.search(r"\bwhere\b", body, re.I):
-        return RiskLevel.DESTRUCTIVE, f"{first} 缺少 WHERE，会影响整张表"
-    if first in {"DELETE", "UPDATE", "INSERT", "REPLACE"}:
-        return RiskLevel.WRITE, f"{first} 为带条件的写操作"
-    return RiskLevel.READ, f"{first} 为只读查询"
-
-
-def scan_shell(command: str) -> tuple[RiskLevel | None, str]:
-    for pattern, why in _SHELL_PATTERNS:
-        if pattern.search(command):
-            return RiskLevel.DESTRUCTIVE, why
-    return RiskLevel.WRITE, "未命中危险模式"
 
 
 def _payload(args: Mapping[str, Any]) -> str:
@@ -190,7 +165,7 @@ def _truncate(text: str, limit: int = 120) -> str:
 def assess(tool_name: str, args: Mapping[str, Any] | None = None) -> Decision:
     args = dict(args or {})
     level = baseline_level(tool_name)
-    reason = f"{tool_name} 默认等级为 {level.value}"
+    reason = _BASELINE_REASONS[level].format(tool=tool_name)
     payload = _payload(args)
 
     if payload and (tool_name in _SHELL_LIKE_TOOLS or tool_name in _SQL_LIKE_TOOLS):
@@ -209,7 +184,7 @@ def assess(tool_name: str, args: Mapping[str, Any] | None = None) -> Decision:
             level, reason = RiskLevel.DESTRUCTIVE, "缺少过滤条件，等价于全表操作"
 
     action = Action.CONFIRM if level is RiskLevel.DESTRUCTIVE else Action.ALLOW
-    preview = _truncate(payload) if payload else _truncate(str(args))
+    preview = _truncate(payload) if payload else _truncate(json.dumps(args, ensure_ascii=False, default=str))
     return Decision(tool=tool_name, level=level, action=action, reason=reason, preview=preview)
 
 

@@ -10,6 +10,7 @@ class CalcResult(BaseModel):
     result: int = Field(description="计算结果")
     expression: str = Field(description="原始计算表达式")
 
+
 parser = JsonOutputParser(pydantic_object=CalcResult)
 format_instructions = parser.get_format_instructions()
 
@@ -24,14 +25,10 @@ agent = create_agent(
     system_prompt=system_prompt,
 )
 
-res = agent.invoke({
-    "messages": [
-        {"role": "user", "content": "100 + 100 = ?"}
-    ]
-})
+res = agent.invoke({"messages": [{"role": "user", "content": "100 + 100 = ?"}]})
 
 final_text = res["messages"][-1].content
 parsed = parser.parse(final_text)
 
-print(parsed)              # {'result': 200, 'expression': '100+100'}
-print(parsed["result"])    # 200
+print(parsed)  # {'result': 200, 'expression': '100+100'}
+print(parsed["result"])  # 200

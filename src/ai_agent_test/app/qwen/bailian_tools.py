@@ -4,17 +4,13 @@ from pydantic import BaseModel, Field
 
 # ---------- 开发工具函数 ----------
 
+
 class AddInput(BaseModel):
     a: int = Field(description="第一个加数")
     b: int = Field(description="第二个加数")
 
 
-@tool(
-    "add",
-    description="add two numbers",
-    args_schema=AddInput,
-    return_direct=False
-)
+@tool("add", description="add two numbers", args_schema=AddInput, return_direct=False)
 def add(a: int, b: int) -> int:
     """add two numbers"""
     return a + b
@@ -25,12 +21,7 @@ class MultiplyInput(BaseModel):
     b: int = Field(description="第二个乘数")
 
 
-@tool(
-    "multiply",
-    description="multiply two numbers",
-    args_schema=MultiplyInput,
-    return_direct=False
-)
+@tool("multiply", description="multiply two numbers", args_schema=MultiplyInput, return_direct=False)
 def multiply(a: int, b: int) -> int:
     """multiply two numbers"""
     return a * b

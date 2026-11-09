@@ -35,25 +35,13 @@ llm = ChatOpenAI(
 
 # 3. 少样本示例（分类情感的例子）
 examples = [
-    {
-        "text": "这部电影太棒了，演员表演非常出色！",
-        "label": "正面"
-    },
-    {
-        "text": "服务很差，食物也难吃。",
-        "label": "负面"
-    },
-    {
-        "text": "天气晴朗，适合出去走走。",
-        "label": "中性"
-    }
+    {"text": "这部电影太棒了，演员表演非常出色！", "label": "正面"},
+    {"text": "服务很差，食物也难吃。", "label": "负面"},
+    {"text": "天气晴朗，适合出去走走。", "label": "中性"},
 ]
 
 # 2. 定义每个示例的格式化模板
-example_prompt = PromptTemplate(
-    input_variables=["text", "label"],
-    template="文本: {text}\n情感: {label}\n"
-)
+example_prompt = PromptTemplate(input_variables=["text", "label"], template="文本: {text}\n情感: {label}\n")
 
 # 3. 构建 FewShotPromptTemplate
 few_shot_prompt = FewShotPromptTemplate(
@@ -62,7 +50,7 @@ few_shot_prompt = FewShotPromptTemplate(
     prefix="请根据以下示例判断文本的情感类别（正面、负面、中性）：",
     suffix="文本: {input_text}\n情感:",
     input_variables=["input_text"],
-    example_separator="\n"  # 示例之间的分隔符
+    example_separator="\n",  # 示例之间的分隔符
 )
 
 # 4. 生成提示
@@ -72,5 +60,3 @@ print(prompt_text)
 for chunk in llm.stream(prompt_text):
     print(chunk.content, end="", flush=True)
 print()  # 最后换行
-
-

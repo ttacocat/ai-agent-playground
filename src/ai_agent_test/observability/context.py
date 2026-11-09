@@ -42,9 +42,7 @@ def truncate_tool_output(message: BaseMessage, limit: int = TRUNCATE_HEAD + TRUN
         return message
     head, tail = text[:TRUNCATE_HEAD], text[-TRUNCATE_TAIL:]
     omitted = len(text) - TRUNCATE_HEAD - TRUNCATE_TAIL
-    return message.model_copy(
-        update={"content": f"{head}\n…（省略 {omitted} 字符）…\n{tail}"}
-    )
+    return message.model_copy(update={"content": f"{head}\n…（省略 {omitted} 字符）…\n{tail}"})
 
 
 def trim_messages(
@@ -110,13 +108,28 @@ class ContextBudgetMiddleware(AgentMiddleware):
         return await handler(self._trimmed_request(request))
 
 
-def build_context_middleware() -> list[Any]:
-    """按配置装配；CONTEXT_MAX_CHARS<=0 表示关闭。"""
+def build_context_middleware(summary_model: Any = None) -> list[Any]:
+    """按配置装配；CONTEXT_MAX_CHARS<=0 表示关闭。
+
+    summary_model 为空时，摘要用默认模型（首次需要压缩时才加载）。
+    """
     from ai_agent_test.config import settings
 
     cfg = settings.context
     if cfg.max_chars <= 0:
         return []
+    cfg.validate()
+    if cfg.strategy == "summarize":
+        from ai_agent_test.observability.summary import ContextSummaryMiddleware
+
+        return [
+            ContextSummaryMiddleware(
+                model=summary_model,
+                max_chars=cfg.max_chars,
+                keep_last=cfg.keep_last,
+                summary_max_chars=cfg.summary_max_chars,
+            )
+        ]
     return [ContextBudgetMiddleware(max_chars=cfg.max_chars, keep_last=cfg.keep_last)]
 
 

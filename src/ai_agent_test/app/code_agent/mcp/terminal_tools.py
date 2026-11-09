@@ -6,10 +6,9 @@ from pydantic import Field
 
 mcp = FastMCP()
 
+
 def run_applescript(script):
-    p = subprocess.Popen(["osascript", "-e", script],
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
+    p = subprocess.Popen(["osascript", "-e", script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     return stdout.decode("utf-8").strip(), stderr.decode("utf-8").strip()
 
@@ -108,69 +107,70 @@ end tell
         return f"AppleScript err: {stderr}"
     return stdout
 
+
 def parse_key_code(button):
     button = button.lower()
 
     keycode_map = {
-        'return': 'return',
-        'space': 'space',
-        'tab': 'tab',
-        'delete': 'delete',
-        'escape': 'escape',
-        'up': 126,
-        'down': 125,
-        'left': 123,
-        'right': 124,
-        'a': 0,
-        'b': 11,
-        'c': 8,
-        'd': 2,
-        'e': 14,
-        'f': 3,
-        'g': 5,
-        'h': 4,
-        'i': 34,
-        'j': 38,
-        'k': 40,
-        'l': 37,
-        'm': 46,
-        'n': 45,
-        'o': 31,
-        'p': 35,
-        'q': 12,
-        'r': 15,
-        's': 1,
-        't': 17,
-        'u': 32,
-        'v': 9,
-        'w': 13,
-        'x': 7,
-        'y': 16,
-        'z': 6,
-        '0': 29,
-        '1': 18,
-        '2': 19,
-        '3': 20,
-        '4': 21,
-        '5': 23,
-        '6': 22,
-        '7': 26,
-        '8': 28,
-        '9': 25,
+        "return": "return",
+        "space": "space",
+        "tab": "tab",
+        "delete": "delete",
+        "escape": "escape",
+        "up": 126,
+        "down": 125,
+        "left": 123,
+        "right": 124,
+        "a": 0,
+        "b": 11,
+        "c": 8,
+        "d": 2,
+        "e": 14,
+        "f": 3,
+        "g": 5,
+        "h": 4,
+        "i": 34,
+        "j": 38,
+        "k": 40,
+        "l": 37,
+        "m": 46,
+        "n": 45,
+        "o": 31,
+        "p": 35,
+        "q": 12,
+        "r": 15,
+        "s": 1,
+        "t": 17,
+        "u": 32,
+        "v": 9,
+        "w": 13,
+        "x": 7,
+        "y": 16,
+        "z": 6,
+        "0": 29,
+        "1": 18,
+        "2": 19,
+        "3": 20,
+        "4": 21,
+        "5": 23,
+        "6": 22,
+        "7": 26,
+        "8": 28,
+        "9": 25,
     }
 
     return keycode_map.get(button, button)
 
 
 def concat_key_codes(key_codes):
-    script = ''
+    script = ""
     for key in key_codes:
         key_code = parse_key_code(key)
         if isinstance(key_code, int):
-            script += f'key code {key_code}\n'
+            script += f"key code {key_code}\n"
         else:
-            script += f'keystroke {key_code}\n'
-        script += 'delay 0.5\n'
+            script += f"keystroke {key_code}\n"
+        script += "delay 0.5\n"
     return script.strip()
 
 
@@ -190,16 +190,16 @@ def send_terminal_keyboard_key(
         ),
     ],
 ) -> bool:
-    print('\nsend_terminal_keyboard_key keycode:', key_codes)
-    print('-' * 50)
-    script = f'''
+    print("\nsend_terminal_keyboard_key keycode:", key_codes)
+    print("-" * 50)
+    script = f"""
 tell application "Terminal"
     activate
     tell application "System Events"
         {concat_key_codes(key_codes)}
     end tell
 end tell
-'''
+"""
     print(script)
     _terminal_content, error = run_applescript(script)
     return not error
