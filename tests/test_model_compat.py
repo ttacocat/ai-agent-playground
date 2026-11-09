@@ -7,7 +7,7 @@ import json
 import httpx
 from pydantic import BaseModel
 
-from ai_agent_test.app.code_agent.model.model import CompatChatOpenAI
+from ai_agent_test.app.code_agent.model.compat import CompatChatOpenAI
 
 REJECT = {
     "error": {
