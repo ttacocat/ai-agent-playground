@@ -16,8 +16,9 @@
 #     ]
 # )
 # print(completion.model_dump_json())
+
 from openai import OpenAI
-import os
+
 client = OpenAI(
     # 如果没有配置环境变量，请用阿里云百炼API Key替换：api_key="sk-xxx"
     api_key="",
@@ -35,9 +36,12 @@ for chunk in completion:
     if chunk.choices:
         delta = chunk.choices[0].delta
         # 只收集思考内容
-        if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
-            if not is_answering:
-                print(delta.reasoning_content, end="", flush=True)
+        if (
+            hasattr(delta, "reasoning_content")
+            and delta.reasoning_content is not None
+            and not is_answering
+        ):
+            print(delta.reasoning_content, end="", flush=True)
         # 收到content，开始进行回复
         if hasattr(delta, "content") and delta.content:
             if not is_answering:

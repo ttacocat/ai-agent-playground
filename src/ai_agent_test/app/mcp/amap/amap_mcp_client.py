@@ -1,13 +1,19 @@
 import asyncio
+import os
+
 from langchain.agents import create_agent
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from ai_agent_test.app.qwen.common import llm, file_tools
+
+from ai_agent_test.app.qwen.common import file_tools, llm
+from ai_agent_test.config import settings
+
+AMAP_MCP_KEY = os.getenv("AMAP_MCP_KEY", "")
 
 
 async def create_amap_mcp_client():
     mcp_config = {
         "amap-maps": {
-            "url": "https://mcp.amap.com/sse?key=",
+            "url": f"https://mcp.amap.com/sse?key={AMAP_MCP_KEY}",
             "transport": "sse"
         }
     }
@@ -18,7 +24,7 @@ async def create_amap_mcp_client():
 
 
 async def create_and_run_agent():
-    client, tools = await create_amap_mcp_client()
+    _client, tools = await create_amap_mcp_client()
 
     system_prompt = "你是一个智能助手，可以调用高德 MCP 工具帮助用户规划出行路线、查询地点坐标等。"
 
@@ -28,12 +34,12 @@ async def create_and_run_agent():
         system_prompt=system_prompt,
     )
 
-    user_question = """
+    user_question = f"""
     目标：
     - 明天上午10点我要从北京四惠地铁站到颐和园
     - 线路选择： 公交地铁或打车
     - 考虑出行时间和路线，以及天气状况和穿衣建议
-    - 输出一个 HTML 页面到：/Users/wxy/ai-code_agent-test/.temp 目录下
+    - 输出一个 HTML 页面到：{settings.paths.work_dir} 目录下
     要求：
     - 制作网页来展示出线路和位置
     - 网页使用简约美观的页面风格，以及卡片展示

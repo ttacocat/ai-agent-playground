@@ -1,5 +1,6 @@
 import subprocess
-from typing import Annotated, List
+from typing import Annotated
+
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
@@ -15,7 +16,7 @@ def run_applescript(script):
 
 @mcp.tool(name="close_terminal_if_open", description="close Terminal.app if it is currently running")
 def close_terminal_if_open() -> str:
-    stdout, stderr = run_applescript("""
+    _stdout, stderr = run_applescript("""
     tell application "System Events"
         if exists process "Terminal" then
             tell application "Terminal" to quit
@@ -28,7 +29,9 @@ def close_terminal_if_open() -> str:
 
 
 @mcp.tool(name="open_new_terminal", description="open or activate Terminal.app, optionally focusing a window by id")
-def open_new_terminal(window_id: Annotated[str, Field(description="optional Terminal window id to focus", examples="1")] = "") -> str:
+def open_new_terminal(
+    window_id: Annotated[str, Field(description="optional Terminal window id to focus", examples=["1"])] = "",
+) -> str:
     if window_id:
         stdout, stderr = run_applescript(f"""
 tell application "Terminal"
@@ -42,7 +45,7 @@ tell application "Terminal"
 end tell
 """)
     else:
-        stdout, stderr = run_applescript("""
+        _stdout, stderr = run_applescript("""
 tell application "Terminal"
     activate
 end tell
@@ -73,7 +76,9 @@ def get_all_terminal_window_ids() -> str:
 
 
 @mcp.tool(name="run_script_in_terminal", description="run a shell script in the front Terminal window")
-def run_script_in_terminal(script: Annotated[str, Field(description="shell script to run in Terminal", examples="pwd")]) -> str:
+def run_script_in_terminal(
+    script: Annotated[str, Field(description="shell script to run in Terminal", examples=["pwd"])],
+) -> str:
     stdout, stderr = run_applescript(f"""
 tell application "Terminal"
     activate
@@ -89,7 +94,10 @@ end tell
     return stdout
 
 
-@mcp.tool(name="get_terminal_full_text", description="get the full text history of the selected tab in the front Terminal window")
+@mcp.tool(
+    name="get_terminal_full_text",
+    description="get the full text history of the selected tab in the front Terminal window",
+)
 def get_terminal_full_text() -> str:
     stdout, stderr = run_applescript("""
 tell application "Terminal"
@@ -166,8 +174,22 @@ def concat_key_codes(key_codes):
     return script.strip()
 
 
-@mcp.tool(name="send_terminal_keyboard_key", description="send a terminal keyboard key to an existing terminal")
-def send_terminal_keyboard_key(key_codes: Annotated[List[str], Field(description="sequence of keys to send, e.g. letters, digits, 'return', 'space', 'tab', 'delete', 'escape', 'up', 'down', 'left', 'right'", examples=[["h", "i", "return"]])]) -> bool:
+@mcp.tool(
+    name="send_terminal_keyboard_key",
+    description="send a terminal keyboard key to an existing terminal",
+)
+def send_terminal_keyboard_key(
+    key_codes: Annotated[
+        list[str],
+        Field(
+            description=(
+                "sequence of keys to send, e.g. letters, digits, 'return', 'space', 'tab', "
+                "'delete', 'escape', 'up', 'down', 'left', 'right'"
+            ),
+            examples=[["h", "i", "return"]],
+        ),
+    ],
+) -> bool:
     print('\nsend_terminal_keyboard_key keycode:', key_codes)
     print('-' * 50)
     script = f'''
@@ -179,11 +201,8 @@ tell application "Terminal"
 end tell
 '''
     print(script)
-    terminal_content, error = run_applescript(script)
-    if error:
-        return False
-    else:
-        return True
+    _terminal_content, error = run_applescript(script)
+    return not error
 
 
 if __name__ == "__main__":

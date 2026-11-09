@@ -1,26 +1,30 @@
 import os
 import pickle
 import threading
-from typing import Any, Optional, Sequence
-from langchain_core.messages import HumanMessage
-from langchain.agents import create_agent
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
 
-from ai_agent_test.app.code_agent.model.model import qwen_llm
-from ai_agent_test.app.code_agent.tools.file_tools import file_tools
+from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
     BaseCheckpointSaver,
+    ChannelVersions,
     Checkpoint,
     CheckpointMetadata,
     CheckpointTuple,
-    ChannelVersions,
 )
+
+from ai_agent_test.app.code_agent.model.model import qwen_llm
+from ai_agent_test.app.code_agent.tools.file_tools import file_tools
+from ai_agent_test.config import settings
 
 
 class FileSaver(BaseCheckpointSaver[str]):
-    def __init__(self, base_path: str = "/Users/wxy/ai-agent-test/.temp/checkpoint"):
+    def __init__(self, base_path: str | Path | None = None):
         super().__init__()
-        self.base_path = base_path
+        self.base_path = str(base_path or settings.paths.checkpoint_dir)
         os.makedirs(self.base_path, exist_ok=True)
         # 简单起见用一把全局锁保护文件读写,避免同一进程内并发写同一线程文件时数据损坏
         self._lock = threading.Lock()
@@ -44,7 +48,7 @@ class FileSaver(BaseCheckpointSaver[str]):
 
     # ---------- BaseCheckpointSaver 核心方法 ----------
 
-    def get_tuple(self, config: RunnableConfig) -> Optional[CheckpointTuple]:
+    def get_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
         thread_id = config["configurable"]["thread_id"]
         checkpoint_id = config["configurable"].get("checkpoint_id")
 

@@ -8,29 +8,31 @@ import requests
 from alibabacloud_bailian20231229 import models as bailian_models
 from alibabacloud_tea_openapi import models as openapi_models
 from alibabacloud_tea_util import models as util_models
-from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-load_dotenv()
+from ai_agent_test.config import BailianConfig, settings
+
 
 def log_step(title: str) -> None:
     print("─" * 50)
     print(f"▶ {title}")
 
-WORKSPACE_ID = os.getenv("WORKSPACE_ID")
-QUERY_INDEX_ID = os.getenv("QUERY_INDEX_ID")
-UPLOAD_CATEGORY_ID = os.getenv("UPLOAD_CATEGORY_ID")
-PARSER = "DASHSCOPE_DOCMIND"
+
+def bailian() -> BailianConfig:
+    """延迟读取百炼配置：import 本模块（例如跑单测）不需要任何凭证。"""
+    return settings.bailian
+
 
 mcp = FastMCP()
 
 def create_client() -> bailian_client.Client:
+    cfg = bailian()
     config = openapi_models.Config(
-        access_key_id=os.getenv("ALI_ACCESS_KEY_ID"),
-        access_key_secret=os.getenv("ALI_ACCESS_KEY_SECRET"),
+        access_key_id=cfg.access_key_id,
+        access_key_secret=cfg.access_key_secret,
     )
-    config.endpoint = "bailian.cn-beijing.aliyuncs.com"
+    config.endpoint = cfg.endpoint
     return bailian_client.Client(config)
 
 
@@ -44,8 +46,9 @@ def retrieve_index(client, workspace_id, index_id, query):
 def query_rag_from_bailian(
     query: Annotated[str, Field(description="访问知识库查询的内容", examples="终端的操作规范")]
 ) -> str:
+    cfg = bailian()
     client = create_client()
-    rag = retrieve_index(client, WORKSPACE_ID, QUERY_INDEX_ID, query)
+    rag = retrieve_index(client, cfg.workspace_id, cfg.query_index_id, query)
 
     nodes = rag.body.data.nodes or []
     result = "".join(node.text for node in nodes)
@@ -133,7 +136,9 @@ def upload_rag_file_to_bailian(client, workspace_id, category_id, file_path):
     upload_file_to_bailian(upload_url, headers, file_path)
 
     log_step("③ 将文件添加到指定分类")
-    add_file_result = add_file_to_bailian_category(client, lease_id, PARSER, category_id, workspace_id)
+    add_file_result = add_file_to_bailian_category(
+        client, lease_id, bailian().parser, category_id, workspace_id
+    )
     file_id = add_file_result.body.data.file_id
     print(f"  • 文件ID: {file_id}")
 
@@ -144,7 +149,15 @@ def upload_rag_file_to_bailian(client, workspace_id, category_id, file_path):
     print(f"✅ 上传完成，共耗时 {time.monotonic() - start:.1f}s")
     return file_id
 
-def create_index(client, workspace_id, name, file_id, structure_type="unstructured", source_type="DATA_CENTER_FILE", sink_type="BUILT_IN"):
+def create_index(
+    client,
+    workspace_id,
+    name,
+    file_id,
+    structure_type="unstructured",
+    source_type="DATA_CENTER_FILE",
+    sink_type="BUILT_IN",
+):
     headers = {}
     runtime = util_models.RuntimeOptions()
     request = bailian_models.CreateIndexRequest(
@@ -187,7 +200,9 @@ def submit_index_add_documents_job(client, workspace_id, index_id, file_id, sour
         document_ids=[file_id],
         source_type=source_type,
     )
-    return client.submit_index_add_documents_job_with_options(workspace_id, submit_index_add_documents_job_request, headers, runtime)
+    return client.submit_index_add_documents_job_with_options(
+        workspace_id, submit_index_add_documents_job_request, headers, runtime
+    )
 
 def add_document_to_index(client, workspace_id, category_id, file_id):
     job_result = submit_index_add_documents_job(client, workspace_id, category_id, file_id)
@@ -195,29 +210,11 @@ def add_document_to_index(client, workspace_id, category_id, file_id):
 
     job_status = get_index_job_status(client, workspace_id, category_id, job_id)
     print(job_status)
+
+
 if __name__ == "__main__":
-    # mcp.run(transport="stdio")
-    bailian_client = create_client()
-    rag_file_path = "/Users/wxy/ai-agent-test/src/ai_agent_test/app/code_agent/rag/rag_test.txt"
-
-    # try:
-    #     upload_rag_file_to_bailian(bailian_client, WORKSPACE_ID, UPLOAD_CATEGORY_ID, rag_file_path)
-    # except Exception as e:
-    #     print(f"❌ 上传流程失败: {e}")
-    #
-    # res = create_index(bailian_client, WORKSPACE_ID, "智能体控制知识库", "file_04705b1cc3ab4c3bb123af0a87eadd8b_17836056")
-    # print(res)
-    rag_index_id = "m93lutppa4"
-    # job_result = submit_index(bailian_client, WORKSPACE_ID, rag_index_id)
-    # job_id = job_result.body.data.id
-    # print(job_id)
-    # job_id = "63cdb3072fb44926bf6de113e86f92b6"
-    # job_status = get_index_job_status(bailian_client, WORKSPACE_ID, rag_index_id, job_id)
-    # print(job_status.body.data)
-    # list_indices_res = list_indices(bailian_client, WORKSPACE_ID)
-    # print(list_indices_res.body.data)
-
-    rag_file_id = "file_29d6dc69017c4f34b05b2bc61cd5f93f_17836056"
-
-    res = submit_index_add_documents_job(bailian_client, WORKSPACE_ID, rag_index_id, rag_file_id)
-    print(res)
+    # 本文件被 agent 当作 MCP server 拉起，入口只能是 mcp.run()。
+    # 之前这里放的是手工实验代码，导致 get_stdio_rag_tools() 拉起进程后
+    # 直接跑完实验退出，一个工具都没暴露出去。手工运维改走 CLI：
+    #   uv run agent rag-upload <file>   上传并挂到已建索引
+    mcp.run(transport="stdio")

@@ -1,14 +1,5 @@
-from ai_agent_test.app.code_agent.utils.mcp import create_mcp_stdio_client
+from ai_agent_test.app.code_agent.utils.mcp import get_stdio_tools
 
 
 async def get_stdio_mysql_tools():
-    params = {
-        "command": "python",
-        "args": [
-            "/Users/wxy/ai-agent-test/src/ai_agent_test/app/code_agent/mcp/mysql_tools.py"
-        ]
-    }
-
-    client, tools = await create_mcp_stdio_client("mysql_tools", params)
-
-    return tools
+    return await get_stdio_tools("mysql_tools", "mcp/mysql_tools.py")

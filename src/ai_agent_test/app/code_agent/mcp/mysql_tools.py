@@ -1,9 +1,11 @@
-from typing import Optional, Dict, Annotated, List
-from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel
-import pymysql
 import re
-from pydantic import Field
+from typing import Annotated
+
+import pymysql
+from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel, Field
+
+from ai_agent_test.config import settings
 
 mcp = FastMCP()
 
@@ -11,28 +13,24 @@ class Response(BaseModel):
     success: bool
     database: str
     table: str
-    data: Optional[dict] | Optional[list]
+    data: None | dict | list
 
-MYSQL_CONFIG = {
-    "host": "192.168.64.2",
-    "port": 3306,
-    "user": "root",
-    "password": "root",
-    'charset': 'utf8mb4',
-}
-
-def get_connection(db):
-    config = MYSQL_CONFIG.copy()
-    if db:
-        config['database'] = db
+def get_connection(database: str | None = None):
+    """按配置建立连接。连接串从环境变量读取，不在代码里出现明文口令。"""
     try:
-        connection = pymysql.connect(**config)
-        return connection
-    except Exception as e:
-        msg = f'mysql connection error: {str(e)}'
-        raise Exception(msg)
+        return pymysql.connect(**settings.mysql.connect_kwargs(database))
+    except pymysql.Error as exc:
+        raise RuntimeError(f"MySQL 连接失败：{exc}") from exc
 
-def execute_query(command, database=None, parmas: Optional[list | tuple] = None):
+
+def _quote_ident(name: str) -> str:
+    """标识符（库名/表名/列名）无法走参数化，统一用反引号包裹并转义。
+
+    所有拼接 SQL 标识符的地方都必须经过这里，避免表名成为注入入口。
+    """
+    return "`" + str(name).replace("`", "``") + "`"
+
+def execute_query(command, database=None, parmas: list | tuple | None = None):
     connection = get_connection(database)
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -61,14 +59,14 @@ def mysql_list_databases():
         databases = [row['Database'] for row in result]
         return databases
     except Exception as e:
-        msg = f'mysql list databases error: {str(e)}'
+        msg = f'mysql list databases error: {e!s}'
         raise Exception(msg)
 
 @mcp.tool(name="mysql_list_tables", description="获取指定数据库中的所有表")
 def mysql_list_tables(database):
     try:
         result = execute_query("show tables", database=database)
-        tables = [list(row.values())[0] for row in result]
+        tables = [next(iter(row.values())) for row in result]
         print(tables)
         return Response(
             success=True,
@@ -77,13 +75,13 @@ def mysql_list_tables(database):
             data=tables
         )
     except Exception as e:
-        msg = f'mysql list tables error: {str(e)}'
+        msg = f'mysql list tables error: {e!s}'
         raise Exception(msg)
 
 @mcp.tool(name="mysql_describe_tables", description="获取表结构信息")
 def mysql_describe_tables(database, table):
     try:
-        result = execute_query(f"describe {table}", database=database)
+        result = execute_query(f"DESCRIBE {_quote_ident(table)}", database=database)
         return Response(
             success=True,
             database=database,
@@ -91,11 +89,11 @@ def mysql_describe_tables(database, table):
             data=result
         )
     except Exception as e:
-        msg = f'mysql describe tables error: {str(e)}'
+        msg = f'mysql describe tables error: {e!s}'
         return msg
 
 @mcp.tool(name="mysql_execute_query", description="执行sql查询语句")
-def mysql_execute_query(command, database=None, parmas: Optional[list] = None):
+def mysql_execute_query(command, database=None, parmas: list | None = None):
     try:
         params_tuple = tuple(parmas) if parmas else None
         result = execute_query(command, database=database, parmas=params_tuple)
@@ -106,21 +104,17 @@ def mysql_execute_query(command, database=None, parmas: Optional[list] = None):
             data=result
         )
     except Exception as e:
-        msg = f'mysql execute_query error: {str(e)}'
+        msg = f'mysql execute_query error: {e!s}'
         return msg
 
 @mcp.tool(name="mysql_insert_data", description="向指定数据库的表中插入一条数据")
-def mysql_insert_data(database: str, table: str, data: Dict[str, str]):
+def mysql_insert_data(database: str, table: str, data: dict[str, str]):
     if not data:
         return "mysql insert data error: data is empty"
 
-    # 表名、列名无法参数化,用反引号包裹并转义内部反引号
-    def quote(name: str) -> str:
-        return "`" + str(name).replace("`", "``") + "`"
-
-    columns = ", ".join(quote(k) for k in data.keys())
+    columns = ", ".join(_quote_ident(k) for k in data)
     placeholders = ", ".join(["%s"] * len(data))
-    sql = f"INSERT INTO {quote(table)} ({columns}) VALUES ({placeholders})"
+    sql = f"INSERT INTO {_quote_ident(table)} ({columns}) VALUES ({placeholders})"
 
     try:
         result = execute_query(sql, database=database, parmas=tuple(data.values()))
@@ -131,22 +125,19 @@ def mysql_insert_data(database: str, table: str, data: Dict[str, str]):
             data=result
         )
     except Exception as e:
-        return f'mysql insert data error: {str(e)}'
+        return f'mysql insert data error: {e!s}'
 
 @mcp.tool(name="mysql_update_data", description="根据条件更新指定数据库表中的数据,where 中的多个条件用 AND 连接")
-def mysql_update_data(database: str, table: str, data: Dict[str, str], where: Dict[str, str]):
+def mysql_update_data(database: str, table: str, data: dict[str, str], where: dict[str, str]):
     if not data:
         return "mysql update data error: data is empty"
     if not where:
         return "mysql update data error: where is empty, refuse to update the whole table"
 
     # 表名、列名无法参数化,用反引号包裹并转义内部反引号
-    def quote(name: str) -> str:
-        return "`" + str(name).replace("`", "``") + "`"
-
-    set_clause = ", ".join([f"{quote(k)} = %s" for k in data.keys()])
-    where_clause = " AND ".join([f"{quote(k)} = %s" for k in where.keys()])
-    command = f"UPDATE {quote(table)} SET {set_clause} WHERE {where_clause}"
+    set_clause = ", ".join([f"{_quote_ident(k)} = %s" for k in data])
+    where_clause = " AND ".join([f"{_quote_ident(k)} = %s" for k in where])
+    command = f"UPDATE {_quote_ident(table)} SET {set_clause} WHERE {where_clause}"
 
     set_params = tuple(data.values())
     where_params = tuple(where.values())
@@ -161,19 +152,15 @@ def mysql_update_data(database: str, table: str, data: Dict[str, str], where: Di
             data=result
         )
     except Exception as e:
-        return f'mysql update data error: {str(e)}'
+        return f'mysql update data error: {e!s}'
 
 @mcp.tool(name="mysql_delete_data", description="根据条件删除指定数据库表中的数据,data 中的多个条件用 AND 连接")
-def mysql_delete_data(database: str, table: str, data: Dict[str, str]):
+def mysql_delete_data(database: str, table: str, data: dict[str, str]):
     if not data:
         return "mysql delete data error: data is empty, refuse to delete the whole table"
 
-    # 表名、列名无法参数化,用反引号包裹并转义内部反引号
-    def quote(name: str) -> str:
-        return "`" + str(name).replace("`", "``") + "`"
-
-    where_clause = " AND ".join([f"{quote(k)} = %s" for k in data.keys()])
-    command = f"DELETE FROM {quote(table)} WHERE {where_clause}"
+    where_clause = " AND ".join([f"{_quote_ident(k)} = %s" for k in data])
+    command = f"DELETE FROM {_quote_ident(table)} WHERE {where_clause}"
     params = tuple(data.values())
 
     try:
@@ -185,7 +172,7 @@ def mysql_delete_data(database: str, table: str, data: Dict[str, str]):
             data=result
         )
     except Exception as e:
-        return f'mysql delete data error: {str(e)}'
+        return f'mysql delete data error: {e!s}'
 
 @mcp.tool(name="mysql_create_database", description="创建数据库,如果已存在则不重复创建")
 def mysql_create_database(database_name: str, charset: str = "utf8mb4"):
@@ -206,7 +193,7 @@ def mysql_create_database(database_name: str, charset: str = "utf8mb4"):
             data={"charset": charset}
         )
     except Exception as e:
-        return f'mysql create database error: {str(e)}'
+        return f'mysql create database error: {e!s}'
 
 @mcp.tool(
     name="mysql_create_table",
@@ -224,7 +211,7 @@ def mysql_create_table(
         description="表名,只能包含字母、数字、下划线和 $",
         examples=["user"],
     )],
-    table_columns: Annotated[List[str], Field(
+    table_columns: Annotated[list[str], Field(
         description=(
             "建表语句中的字段定义列表,每个元素是一个字段(或索引/约束)的完整定义,"
             "格式为 '字段名 类型 [约束] [COMMENT ...]'。不要包含外层括号和表名,也不要带分号"
@@ -267,7 +254,7 @@ def mysql_create_table(
             data=columns
         )
     except Exception as e:
-        return f'mysql create table error: {str(e)}'
+        return f'mysql create table error: {e!s}'
 
 @mcp.tool(
     name="mysql_execute_command",
@@ -312,7 +299,7 @@ def mysql_execute_command(
             data=result
         )
     except Exception as e:
-        return f'mysql execute command error: {str(e)}'
+        return f'mysql execute command error: {e!s}'
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

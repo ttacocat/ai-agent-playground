@@ -1,6 +1,8 @@
 from langchain.agents import create_agent
 from langchain_experimental.tools.python.tool import PythonREPLTool
+
 from ai_agent_test.app.qwen.common import llm
+from ai_agent_test.config import settings
 
 tools = [PythonREPLTool()]
 
@@ -12,9 +14,9 @@ agent = create_agent(
 注意：调用工具时传入的 Python 代码不要加 ```python``` 或 ```py``` 这类 Markdown 代码块标记，直接传纯代码。""",
 )
 
-user_input = """
+user_input = f"""
 要求：
-1. 向 /Users/wxy/ai-code_agent-test/.temp 目录下写入一个新文件，名称为：index.html
+1. 向 {settings.paths.work_dir} 目录下写入一个新文件，名称为：index.html
 2. 写一个企业的官网
 """
 

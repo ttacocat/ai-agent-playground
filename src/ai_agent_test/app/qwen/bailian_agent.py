@@ -1,8 +1,10 @@
 from langchain.agents import create_agent
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
+
 from ai_agent_test.app.qwen.bailian_tools import tools
 from ai_agent_test.app.qwen.common import llm
+
 
 class CalcResult(BaseModel):
     result: int = Field(description="计算结果")
